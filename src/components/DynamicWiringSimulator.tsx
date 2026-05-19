@@ -106,26 +106,26 @@ function makePath(x1: number, y1: number, x2: number, y2: number, side: 'left' |
 }
 
 // ─── Resistor breadboard placement ───────────────────────────────────────────
-const RES_COL_ESP   = BB_L0;        // x=24  left block ESP side
-const RES_COL_COMP  = BB_L0 + 24;  // x=48  left block component side
-const RES_MID_X     = BB_L0 + 12;  // x=36  left block center
+const RES_COL_ESP = BB_L0;        // x=24  left block ESP side
+const RES_COL_COMP = BB_L0 + 24;  // x=48  left block component side
+const RES_MID_X = BB_L0 + 12;  // x=36  left block center
 
-const RES_COL_ESP_R  = 276;  // right block ESP side
+const RES_COL_ESP_R = 276;  // right block ESP side
 const RES_COL_COMP_R = 252;  // right block component side
-const RES_MID_X_R    = 264;  // right block center
+const RES_MID_X_R = 264;  // right block center
 
 function resRowY(pinIndex: number): number {
-  return rowY(3 + pinIndex * 2);
+    return rowY(3 + pinIndex * 2);
 }
 
-function makePathA(x1:number, y1:number, resY:number, side:'left'|'right'): string {
-  const colComp = side === 'right' ? RES_COL_COMP_R : RES_COL_COMP;
-  return `M${x1},${y1} L${x1},${resY} L${colComp},${resY}`;
+function makePathA(x1: number, y1: number, resY: number, side: 'left' | 'right'): string {
+    const colComp = side === 'right' ? RES_COL_COMP_R : RES_COL_COMP;
+    return `M${x1},${y1} L${x1},${resY} L${colComp},${resY}`;
 }
 
-function makePathB(resY:number, x2:number, y2:number, side:'left'|'right', laneOffset=0): string {
-  const colEsp = side === 'right' ? RES_COL_ESP_R : RES_COL_ESP;
-  return makePath(colEsp, resY, x2, y2, side, laneOffset);
+function makePathB(resY: number, x2: number, y2: number, side: 'left' | 'right', laneOffset = 0): string {
+    const colEsp = side === 'right' ? RES_COL_ESP_R : RES_COL_ESP;
+    return makePath(colEsp, resY, x2, y2, side, laneOffset);
 }
 
 // ─── Component pin definitions ────────────────────────────────────────────────
@@ -296,8 +296,8 @@ function WireEl({ w, running }: { w: WireData; running: boolean }) {
     const rafId = useRef<number>(0);
 
     // Side-aware resistor positions
-    const midX    = w.side === 'right' ? RES_MID_X_R   : RES_MID_X;
-    const colESP  = w.side === 'right' ? RES_COL_ESP_R  : RES_COL_ESP;
+    const midX = w.side === 'right' ? RES_MID_X_R : RES_MID_X;
+    const colESP = w.side === 'right' ? RES_COL_ESP_R : RES_COL_ESP;
     const colCOMP = w.side === 'right' ? RES_COL_COMP_R : RES_COL_COMP;
 
     const dA = w.hasR ? makePathA(w.x1, w.y1, w.resY, w.side) : makePath(w.x1, w.y1, w.x2, w.y2, w.side, w.laneOffset);
@@ -390,11 +390,11 @@ function WireEl({ w, running }: { w: WireData; running: boolean }) {
                         {/* Resistor body */}
                         <g transform={`translate(${midX},${w.resY})`}>
                             <line x1="-18" y1="0" x2="-12" y2="0" stroke="#999" strokeWidth="1.8" />
-                            <line x1="12"  y1="0" x2="18"  y2="0" stroke="#999" strokeWidth="1.8" />
+                            <line x1="12" y1="0" x2="18" y2="0" stroke="#999" strokeWidth="1.8" />
                             <rect x="-12" y="-6" width="24" height="12" rx="3.5" fill="#c8903c" stroke="#8a6000" strokeWidth="1.2" />
-                            <rect x="-9"  y="-6" width="5"  height="12" fill="#c0392b" opacity="0.95" />
-                            <rect x="-3"  y="-6" width="5"  height="12" fill="#c0392b" opacity="0.95" />
-                            <rect x="3"   y="-6" width="5"  height="12" fill="#6d3800" opacity="0.95" />
+                            <rect x="-9" y="-6" width="5" height="12" fill="#c0392b" opacity="0.95" />
+                            <rect x="-3" y="-6" width="5" height="12" fill="#c0392b" opacity="0.95" />
+                            <rect x="3" y="-6" width="5" height="12" fill="#6d3800" opacity="0.95" />
                             <text x="0" y="-10" fill="#e6a020" fontSize="8.5" fontFamily="monospace" textAnchor="middle" fontWeight="700">220Ω</text>
                         </g>
                         {/* ESP32 side leg hole */}
@@ -762,8 +762,8 @@ function DistanceAlarmBody({ running, sim }: { running: boolean; sim?: string })
             }
 
             {/* Buzzer */}
-            <text x="235" y="-6" fill="#4a5568" fontSize="9" textAnchor="middle" fontFamily="monospace">BUZZER</text>
-            <g transform="translate(188,0)">
+            <text x="238" y="10" fill="#4a5568" fontSize="9" textAnchor="middle" fontFamily="monospace">BUZZER</text>
+            <g transform="translate(188,15)">
                 <circle cx="50" cy="50" r="46" fill="#111" stroke="#222" strokeWidth="2" />
                 <circle cx="50" cy="50" r="30" fill="#1a1a1a" />
                 <circle cx="50" cy="50" r="14" fill="#2a2a2a" />
@@ -772,7 +772,7 @@ function DistanceAlarmBody({ running, sim }: { running: boolean; sim?: string })
                     <circle key={i} cx="50" cy="50" r={r * 30} fill="none" stroke="#fbbf24" strokeWidth="2"
                         opacity={0.65 - i * 0.19} style={{ animation: `ping 0.6s ${i * 0.12}s ease-out infinite` }} />
                 ))}
-                <text x="50" y="110" fill={alarm ? '#fbbf24' : '#4a5568'} fontSize="9" fontWeight="700"
+                <text x="50" y="160" fill={alarm ? '#fbbf24' : '#4a5568'} fontSize="9" fontWeight="700"
                     textAnchor="middle" fontFamily="monospace">
                     {running ? (alarm ? '⚠ BEEP' : 'SILENT') : 'BUZZER'}
                 </text>
@@ -1348,64 +1348,15 @@ function Board({ step, doneKeys, running }: {
                 fill="#0f172a"
             />
 
-            {/* ───────────────── BUTTONS ───────────────── */}
-            <rect
-                x="76"
-                y="368"
-                width="17"
-                height="12"
-                rx="3"
-                fill="#0f172a"
-                stroke="#1e2535"
-            />
+            {/* ── EN button ── */}
+            <rect x="118" y="350" width="17" height="12" rx="3" fill="#0f172a" stroke="#1e2535" />
+            <circle cx="126" cy="356" r="5" fill="#1a4a8a" opacity="0.9" />
+            <text x="126" y="368" fill="#ffffff" fontSize="5" textAnchor="middle" fontFamily="Inter">EN</text>
 
-            <circle
-                cx="84"
-                cy="374"
-                r="5"
-                fill="#1a4a8a"
-                opacity="0.9"
-            />
-
-            <text
-                x="84"
-                y="386"
-                fill="#2a4060"
-                fontSize="5"
-                textAnchor="middle"
-                fontFamily="Inter"
-            >
-                EN
-            </text>
-
-            <rect
-                x="218"
-                y="368"
-                width="17"
-                height="12"
-                rx="3"
-                fill="#0f172a"
-                stroke="#1e2535"
-            />
-
-            <circle
-                cx="226"
-                cy="374"
-                r="5"
-                fill="#8a1010"
-                opacity="0.9"
-            />
-
-            <text
-                x="226"
-                y="386"
-                fill="#4a1a1a"
-                fontSize="5"
-                textAnchor="middle"
-                fontFamily="Inter"
-            >
-                BOOT
-            </text>
+            {/* ── BOOT button ── */}
+            <rect x="181" y="350" width="17" height="12" rx="3" fill="#0f172a" stroke="#1e2535" />
+            <circle cx="189" cy="356" r="5" fill="#8a1010" opacity="0.9" />
+            <text x="189" y="368" fill="#ffffff" fontSize="5" textAnchor="middle" fontFamily="Inter">BOOT</text>
 
             {/* ───────────────── LEFT PINS ───────────────── */}
             {LP.map((pin, i) => {
