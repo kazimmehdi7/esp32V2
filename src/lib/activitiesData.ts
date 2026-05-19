@@ -518,7 +518,7 @@ void loop() {
         'Place the button on the breadboard straddling the center gap',
         'Connect one button leg → GPIO 0 on ESP32',
         'Connect other button leg → GND',
-        'Wire LED anode → 220Ω resistor → GPIO 48',
+        'Wire LED anode → 220Ω resistor → GPIO 4',
         'Wire LED cathode → GND',
         'Upload code — the built-in pull-up does the rest',
       ],

@@ -279,6 +279,7 @@ function IntroStep({ activity }: { activity: any }) {
 function EquipmentStep({ activity }: { activity: any }) {
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="rounded-3xl bg-[#1a2d45] p-6 text-white">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/20 text-xl">🔧</div>
@@ -288,52 +289,43 @@ function EquipmentStep({ activity }: { activity: any }) {
           </div>
         </div>
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2.5">
-          <span className="text-lg">🛒</span>
           <p className="text-[11px] font-semibold text-white/80">
-            {activity.equipment.length} items needed — most in an ESP32 Starter Kit for under $15
+            🛒 {activity.equipment.length} items needed — All of them are available in "Build Mind" mediatiz foundation kit.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {activity.equipment.map((item: any, idx: number) => {
-          const c = CARD_COLORS[idx % CARD_COLORS.length];
-          return (
+      {/* Equipment list — clean rows, no images, no emoji */}
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+        <div className="divide-y divide-gray-100">
+          {activity.equipment.map((item: any, idx: number) => (
             <div
               key={idx}
-              className={`group relative flex flex-col items-center rounded-2xl border-2 border-transparent bg-white p-4 text-center shadow-sm transition-all duration-300 cursor-default hover:-translate-y-1.5 hover:shadow-lg ${c.border} ${c.shadow}`}
+              className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-[#f8f9fb]"
             >
-              <div className={`absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-extrabold text-white shadow ${c.badge}`}>
+              <div className="flex items-center gap-4">
+                {/* Index number */}
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1a2d45] text-[11px] font-bold text-white">
+                  {idx + 1}
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-[#1a2d45]">{item.name}</p>
+                  <p className="text-[11px] text-gray-400">{item.description}</p>
+                </div>
+              </div>
+              {/* Quantity badge */}
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-extrabold text-amber-700">
                 {item.quantity}
               </div>
-              <div className="relative h-24 w-24 overflow-hidden rounded-2xl">
-                {item.image ? (
-                  <>
-                    <div
-                      className="absolute inset-0 scale-110 blur-md brightness-75"
-                      style={{ backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-                    />
-                    <div className="relative z-10 flex h-full w-full items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                      <Image src={item.image} alt={item.name} width={96} height={96} className="h-full w-full object-contain p-2 drop-shadow" />
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-[#f0f4f8]">
-                    <span className="text-5xl transition-transform duration-300 group-hover:scale-110">{item.emoji}</span>
-                  </div>
-                )}
-              </div>
-              <p className="mt-3 text-[13px] font-extrabold leading-tight text-[#1a2d45]">{item.name}</p>
-              <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-gray-400">{item.description}</p>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
+      {/* Tip */}
       <div className="flex items-start gap-3 rounded-2xl border-2 border-blue-100 bg-blue-50 p-4">
-        <span className="text-xl">💡</span>
         <p className="text-[11px] font-semibold leading-relaxed text-blue-700">
-          Search for an &quot;ESP32 Starter Kit&quot; on Amazon or AliExpress — usually includes most parts in one box!
+          💡 Search for an &quot;ESP32 Starter Kit&quot; on Amazon or AliExpress — usually includes most parts in one box!
         </p>
       </div>
     </div>
@@ -344,16 +336,14 @@ function EquipmentStep({ activity }: { activity: any }) {
 
 function AssembleStep({ activity }: { activity: any }) {
   const hasWiring = !!activity.wiringComponent;
-  const [view, setView] = useState<'wiring' | 'simulator' | 'video'>(hasWiring ? 'wiring' : 'simulator');
+  const [view, setView] = useState<'wiring' | 'video'>(hasWiring ? 'wiring' : 'video');
 
   return (
     <div className="space-y-4">
-
-      {/* Tab pill selector */}
+      {/* Tab selector */}
       <div className="flex gap-1.5 rounded-2xl bg-[#f0f2f5] p-1.5">
         {[
           ...(hasWiring ? [{ id: 'wiring' as const, label: '🔌 Wire It Up' }] : []),
-          { id: 'simulator' as const, label: '🧩 Simulator' },
           { id: 'video' as const, label: '▶ Video' },
         ].map((t) => (
           <button
@@ -371,16 +361,9 @@ function AssembleStep({ activity }: { activity: any }) {
         ))}
       </div>
 
-      {/* Wiring */}
+      {/* Wiring Simulator */}
       {view === 'wiring' && activity.wiringComponent && (
         <DynamicWiringSimulator component={activity.wiringComponent} />
-      )}
-
-      {/* Simulator */}
-      {view === 'simulator' && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <InlineSimulator activity={activity} />
-        </div>
       )}
 
       {/* Video */}
@@ -399,15 +382,15 @@ function AssembleStep({ activity }: { activity: any }) {
         </div>
       )}
 
-      {/* Wiring steps */}
+      {/* Wiring Steps */}
       <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-4 flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#1a2d45] text-sm">🛠️</div>
           <h3 className="text-[13px] font-semibold text-[#1a2d45]">Wiring steps</h3>
         </div>
         <div className="space-y-2">
           {activity.assemble.steps.map((step: string, idx: number) => (
-            <div key={idx} className="flex items-start gap-3 rounded-xl bg-[#f8f9fb] px-4 py-3">
+            <div key={idx} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-[#f8f9fb] px-4 py-3 transition-all hover:border-[#1a2d45]/20 hover:bg-[#f0f4f8]">
               <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1a2d45] text-[10px] font-semibold text-white mt-0.5">
                 {idx + 1}
               </div>
