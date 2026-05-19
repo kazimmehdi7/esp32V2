@@ -422,8 +422,8 @@ function DHT22Body({ running, out }: { running: boolean; out?: string }) {
             {[0, 1, 2, 3].map(r => [0, 1, 2, 3, 4].map(c => (
                 <circle key={`${r}${c}`} cx={24 + c * 24} cy={24 + r * 18} r="3" fill="#1a3a6a" opacity="0.8" />
             )))}
-            <text x="80" y="112" fill="#63b3ed" fontSize="13" fontWeight="700" textAnchor="middle" fontFamily="monospace">DHT22</text>
-            <text x="80" y="126" fill="#4299e1" fontSize="8" textAnchor="middle" fontFamily="monospace">TEMP + HUMIDITY</text>
+            <text x="80" y="112" fill="#ffffff" fontSize="13" fontWeight="700" textAnchor="middle" fontFamily="monospace">DHT22</text>
+            <text x="80" y="126" fill="#ffffff" fontSize="8" textAnchor="middle" fontFamily="monospace">TEMP + HUMIDITY</text>
             <rect x="8" y="132" width="144" height="22" rx="4" fill="#010a18" stroke="#1a4a7a" strokeWidth="1" />
             {running && out
                 ? <text x="80" y="147" fill="#00e676" fontSize="11" fontWeight="700" textAnchor="middle" fontFamily="monospace">{out}</text>
@@ -1498,6 +1498,7 @@ export default function DynamicWiringSimulator({ component }: { component: Compo
     const serEl = useRef<HTMLDivElement>(null);
 
     const tw = steps.filter(s => s.wire).length;
+    const connectedCount = drawn.size;
     const allDone = drawn.size === tw;
     const isLast = cur === steps.length - 1;
     const s = steps[cur];
@@ -1612,251 +1613,294 @@ export default function DynamicWiringSimulator({ component }: { component: Compo
     const cName = compLabel(component.type);
 
     return (
-        <div style={{ background: '#070c14', borderRadius: 12, overflow: 'hidden', border: '1px solid #1a2535', fontFamily: 'monospace' }}>
-            <style>{`@keyframes ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}`}</style>
+    <div style={{ background: '#0f1117', borderRadius: 14, overflow: 'hidden', border: '1px solid #1e2a3a', fontFamily: 'Inter, system-ui, sans-serif', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <style>{`@keyframes ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}`}</style>
 
-            {/* Toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 16px', background: '#0c1520', borderBottom: '1px solid #1a2535' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                        {['#ff5f57', '#febc2e', '#28c840'].map(c => (
-                            <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }} />
-                        ))}
-                    </div>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#e2e8f0' }}>{cName} — {component.label || component.type}</span>
-                    <span style={{ background: '#0a2040', color: '#63b3ed', fontSize: 10, padding: '2px 9px', borderRadius: 99, border: '1px solid #2b6cb0' }}>
-                        Step {cur + 1}/{steps.length}
+        {/* ── Toolbar ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', background: '#0a0f18', borderBottom: '1px solid #1e2a3a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                    {['#ff5f57','#febc2e','#28c840'].map(c=>(
+                        <div key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c }}/>
+                    ))}
+                </div>
+                <div style={{ width: 1, height: 16, background: '#1e2a3a' }}/>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', letterSpacing: -0.2 }}>
+                    {cName}
+                </span>
+                <span style={{ fontSize: 11, color: '#4a6a8a', fontWeight: 400 }}>
+                    {component.label || component.type}
+                </span>
+                <span style={{ background: '#1a2f4a', color: '#60a5fa', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, border: '1px solid #2a4a6a' }}>
+                    {cur + 1} / {steps.length}
+                </span>
+                {allDone && (
+                    <span style={{ background: '#0a2a1a', color: '#4ade80', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99, border: '1px solid #166534', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', animation: 'pulse 1.5s infinite' }}/>
+                        Wired
                     </span>
-                    {allDone && <span style={{ background: '#0a2518', color: '#48bb78', fontSize: 10, padding: '2px 9px', borderRadius: 99, border: '1px solid #276749' }}>✓ Wired</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 7 }}>
-                    <button onClick={reset} style={{ background: '#111a28', border: '1px solid #1e2d40', color: '#718096', fontSize: 11, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', fontFamily: 'monospace' }}>
-                        ↺ Reset
-                    </button>
-                    <button onClick={() => { if (allDone || running) setRunning(r => !r); }}
-                        style={{
-                            background: running ? '#2d0a0a' : allDone ? '#0a2510' : '#111a28',
-                            border: `1px solid ${running ? '#9b2c2c' : allDone ? '#276749' : '#1e2d40'}`,
-                            color: running ? '#fc8181' : allDone ? '#68d391' : '#4a5568',
-                            fontSize: 11, padding: '5px 14px', borderRadius: 7,
-                            cursor: allDone || running ? 'pointer' : 'default',
-                            opacity: allDone || running ? 1 : .45, fontFamily: 'monospace'
-                        }}>
-                        {running ? '⏹ Stop' : '▶ Run'}
-                    </button>
-                </div>
+                )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={reset} style={{ background: 'transparent', border: '1px solid #1e2a3a', color: '#64748b', fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    ↺ Reset
+                </button>
+                <button onClick={() => { if (allDone || running) setRunning(r => !r); }}
+                    style={{ background: running ? '#450a0a' : allDone ? '#052e16' : '#1a2f4a', border: `1px solid ${running ? '#7f1d1d' : allDone ? '#166534' : '#2a4a6a'}`, color: running ? '#f87171' : allDone ? '#4ade80' : '#60a5fa', fontSize: 12, fontWeight: 700, padding: '6px 18px', borderRadius: 8, cursor: allDone || running ? 'pointer' : 'default', opacity: allDone || running ? 1 : .4, fontFamily: 'inherit' }}>
+                    {running ? '⏹ Stop' : '▶ Run'}
+                </button>
+            </div>
+        </div>
+
+        {/* ── Progress bar ── */}
+        <div style={{ height: 2, background: '#1e2a3a' }}>
+            <div style={{ height: '100%', background: allDone ? '#4ade80' : '#3b82f6', width: `${Math.round((connectedCount / Math.max(tw,1)) * 100)}%`, transition: 'width .4s ease' }}/>
+        </div>
+
+        {/* ── Main split ── */}
+        <div ref={contRef} style={{ display: 'flex', height: 460, position: 'relative' }}>
+
+            {/* Left: Circuit */}
+            <div style={{ width: `${split}%`, flexShrink: 0, background: '#060a12', overflow: 'hidden' }}>
+                <svg viewBox="0 0 720 440" width="100%" height="460" style={{ display: 'block' }} preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <filter id="esp-shadow">
+                            <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000" floodOpacity="0.55"/>
+                        </filter>
+                    </defs>
+                    <Board step={s} doneKeys={dk} running={running}/>
+                    <CompGroup type={component.type} dp={dp}
+                        active={s.wire && !drawn.has(cur) ? s.wire.cpName : undefined}
+                        running={running} sim={sim}/>
+                    {s.wire && !drawn.has(cur) && (
+                        <path
+                            d={s.wire.hasR
+                                ? makePathB(s.wire.resY, s.wire.x2, s.wire.y2, s.wire.side, s.wire.laneOffset)
+                                : makePath(s.wire.x1, s.wire.y1, s.wire.x2, s.wire.y2, s.wire.side, s.wire.laneOffset)}
+                            fill="none" stroke={s.wire.color} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.3"
+                        />
+                    )}
+                    {[...drawn].map(idx => {
+                        const w = steps[idx].wire;
+                        if (!w) return null;
+                        return <WireEl key={idx} w={w} running={running}/>;
+                    })}
+                </svg>
             </div>
 
-            {/* Main split */}
-            <div ref={contRef} style={{ display: 'flex', height: 460, position: 'relative' }}>
+            {/* Drag handle */}
+            <div onMouseDown={drag}
+                style={{ width: 3, flexShrink: 0, background: '#1e2a3a', cursor: 'col-resize', transition: 'background .15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#3b82f6')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#1e2a3a')}
+            />
 
-                {/* Left: Circuit */}
-                <div style={{ width: `${split}%`, flexShrink: 0, background: '#0a1020', overflow: 'hidden' }}>
-                    <svg viewBox="0 0 720 440" width="100%" height="460" style={{ display: 'block' }} preserveAspectRatio="xMidYMid meet">
-                        <defs>
-                            <filter id="esp-shadow">
-                                <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#000" floodOpacity="0.55" />
-                            </filter>
-                        </defs>
-                        <Board step={s} doneKeys={dk} running={running} />
-                        <CompGroup type={component.type} dp={dp}
-                            active={s.wire && !drawn.has(cur) ? s.wire.cpName : undefined}
-                            running={running} sim={sim} />
-                        {/* Ghost wire preview */}
-                        {s.wire && !drawn.has(cur) && (
-                            <path
-                                d={s.wire.hasR
-                                    ? makePathB(s.wire.resY, s.wire.x2, s.wire.y2, s.wire.side, s.wire.laneOffset)
-                                    : makePath(s.wire.x1, s.wire.y1, s.wire.x2, s.wire.y2, s.wire.side, s.wire.laneOffset)}
-                                fill="none" stroke={s.wire.color} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.28"
-                            />
-                        )}
-                        {/* Drawn wires */}
-                        {[...drawn].map(idx => {
-                            const w = steps[idx].wire;
-                            if (!w) return null;
-                            return <WireEl key={idx} w={w} running={running} />;
-                        })}
-                    </svg>
+            {/* Right: Panels */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#0a0f18' }}>
+
+                {/* Tab bar */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #1e2a3a', background: '#0a0f18' }}>
+                    {([
+                        { id: 'learn',  label: 'Learn',  icon: '📖' },
+                        { id: 'serial', label: 'Serial', icon: '📟' },
+                    ] as const).map(t => (
+                        <button key={t.id} onClick={() => setTab(t.id as any)} style={{
+                            flex: 1, padding: '11px 8px', fontSize: 12, fontWeight: 600,
+                            fontFamily: 'inherit', background: 'transparent',
+                            color: tab === t.id ? '#60a5fa' : '#4a6a8a',
+                            border: 'none', borderBottom: tab === t.id ? '2px solid #3b82f6' : '2px solid transparent',
+                            cursor: 'pointer', transition: 'all .15s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}>
+                            {t.icon} {t.label}
+                        </button>
+                    ))}
                 </div>
 
-                {/* Drag handle */}
-                <div onMouseDown={drag}
-                    style={{ width: 4, flexShrink: 0, background: '#1a2535', cursor: 'col-resize', transition: 'background .15s' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#2b6cb0')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#1a2535')}
-                />
+                {/* ── Learn Tab ── */}
+                {tab === 'learn' && (
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-                {/* Right: Panels */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    {/* Tab bar */}
-                    <div style={{ display: 'flex', borderBottom: '1px solid #1a2535', background: '#0c1520' }}>
-                        {(['learn', 'log', 'serial'] as const).map(id => (
-                            <button key={id} onClick={() => setTab(id)} style={{
-                                flex: 1, padding: '7px 4px', fontSize: 10, fontWeight: 500, fontFamily: 'monospace',
-                                background: tab === id ? '#0d2040' : 'transparent',
-                                color: tab === id ? '#63b3ed' : '#4a5568',
-                                border: 'none', borderBottom: tab === id ? '2px solid #2b6cb0' : '2px solid transparent',
-                                cursor: 'pointer',
-                            }}>
-                                {id === 'learn' ? 'Learn' : id === 'log' ? 'Log' : 'Serial'}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Learn tab */}
-                    {tab === 'learn' && (
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', background: '#080c14' }}>
-                            <div style={{ background: '#0d1e38', border: '1px solid #1a3050', borderRadius: 8, padding: '12px', marginBottom: 10 }}>
-                                <div style={{ fontSize: 10, color: '#4a6080', marginBottom: 6, fontWeight: 600 }}>WHY THIS CONNECTION?</div>
-                                <div style={{ fontSize: 11, color: '#63b3ed', lineHeight: 1.8 }}>{s.why}</div>
+                        {/* Why card */}
+                        <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #1e3a5a' }}>
+                            <div style={{ padding: '8px 14px', background: '#0d1e38', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 14 }}>💡</span>
+                                <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700, letterSpacing: 0.5 }}>Why this connection?</span>
                             </div>
-                            {s.wire?.hasR && (
-                                <div style={{ background: '#1a1200', border: '1px solid #b7791f', borderRadius: 8, padding: '12px', marginBottom: 10 }}>
-                                    <div style={{ fontSize: 10, color: '#d69e2e', fontWeight: 600, marginBottom: 5 }}>⚡ 220Ω RESISTOR REQUIRED</div>
-                                    <div style={{ fontSize: 11, color: '#b7791f', lineHeight: 1.8 }}>
-                                        Without a resistor, LED draws 80mA+ — burns instantly and damages ESP32 GPIO.
-                                        The 220Ω resistor limits current to ~15mA (safe range).
-                                        Place it in the breadboard between the GPIO wire and LED anode leg.
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ background: '#0a1428', border: '1px solid #1a2a40', borderRadius: 8, padding: '12px' }}>
-                                <div style={{ fontSize: 10, color: '#2a3a50', fontWeight: 600, marginBottom: 8 }}>PIN GUIDE</div>
-                                {(CPINS[component.type] || []).filter(p => p.name !== 'NC').map(p => (
-                                    <div key={p.name} style={{ display: 'flex', gap: 8, marginBottom: 7, alignItems: 'flex-start' }}>
-                                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0, marginTop: 3 }} />
-                                        <div style={{ fontSize: 10, color: '#4a6080', lineHeight: 1.5 }}>
-                                            <span style={{ color: '#90cdf4', fontWeight: 600 }}>{p.name}:</span> {p.tip}
-                                        </div>
-                                    </div>
-                                ))}
+                            <div style={{ padding: '12px 14px', background: '#080f1e' }}>
+                                <p style={{ fontSize: 12, color: '#94b8d8', lineHeight: 1.85, margin: 0 }}>{s.why}</p>
                             </div>
                         </div>
-                    )}
 
-                    {/* Log tab */}
-                    {tab === 'log' && (
-                        <div ref={logEl} style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', background: '#080c14' }}>
-                            {logs.map((l, i) => (
-                                <div key={i} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '4px 0', borderBottom: '1px solid #0d1220' }}>
-                                    <span style={{ fontSize: 8, color: '#1e2d3a', flexShrink: 0 }}>{l.ts}</span>
-                                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: l.c, flexShrink: 0, marginTop: 4 }} />
-                                    <span style={{ fontSize: 10, color: '#3a5070', lineHeight: 1.5 }}>{l.t}</span>
+                        {/* Resistor warning */}
+                        {s.wire?.hasR && (
+                            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #92400e' }}>
+                                <div style={{ padding: '8px 14px', background: '#1c1000', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 14 }}>⚡</span>
+                                    <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700, letterSpacing: 0.5 }}>220Ω Resistor Required</span>
+                                </div>
+                                <div style={{ padding: '12px 14px', background: '#0f0a00' }}>
+                                    <p style={{ fontSize: 12, color: '#b45309', lineHeight: 1.85, margin: 0 }}>
+                                        Without a resistor, LED draws 80mA+ — burns instantly and damages the ESP32 GPIO pin.
+                                        220Ω limits current to ~15mA. Place it in the breadboard between the GPIO wire and LED anode.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Pin guide */}
+                        <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #1e2a3a' }}>
+                            <div style={{ padding: '8px 14px', background: '#0d1525', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 14 }}>📌</span>
+                                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, letterSpacing: 0.5 }}>Pin Guide</span>
+                            </div>
+                            <div style={{ padding: '10px 14px', background: '#080f1e', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {(CPINS[component.type] || []).filter(p => p.name !== 'NC').map(p => {
+                                    const isDone = dp.has(p.name.toUpperCase());
+                                    return (
+                                        <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', borderRadius: 8, background: isDone ? `${p.color}18` : '#0d1525', border: `1px solid ${isDone ? p.color + '40' : '#1e2a3a'}`, transition: 'all .3s' }}>
+                                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color, boxShadow: isDone ? `0 0 7px ${p.color}` : 'none', flexShrink: 0, transition: 'all .3s' }}/>
+                                            <span style={{ fontSize: 12, color: isDone ? '#f1f5f9' : '#7dd3fc', fontWeight: 700, minWidth: 40 }}>{p.name}</span>
+                                            <span style={{ fontSize: 11, color: '#4a6a8a', flex: 1, lineHeight: 1.4 }}>{p.tip}</span>
+                                            {isDone && <span style={{ fontSize: 13, color: '#4ade80', flexShrink: 0 }}>✓</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                    </div>
+                )}
+
+                {/* ── Serial Tab ── */}
+                {(tab as string) === 'serial' && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#020408', overflow: 'hidden' }}>
+                        <div style={{ padding: '8px 14px', borderBottom: '1px solid #0a1a0a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    {['#ff5f57','#febc2e','#28c840'].map(c=>(
+                                        <div key={c} style={{ width: 8, height: 8, borderRadius: '50%', background: c }}/>
+                                    ))}
+                                </div>
+                                <span style={{ fontSize: 10, color: '#1a3a1a', fontFamily: 'monospace', fontWeight: 600, letterSpacing: 0.5 }}>
+                                    115200 BAUD · {component.type}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <div style={{ width: 6, height: 6, borderRadius: '50%', background: running ? '#4ade80' : '#1a3a1a', boxShadow: running ? '0 0 5px #4ade80' : 'none', animation: running ? 'pulse 1.5s infinite' : 'none' }}/>
+                                <span style={{ fontSize: 10, color: running ? '#4ade80' : '#1a3a1a', fontFamily: 'monospace', fontWeight: 700 }}>
+                                    {running ? 'LIVE' : 'IDLE'}
+                                </span>
+                            </div>
+                        </div>
+                        <div ref={serEl} style={{ flex: 1, overflowY: 'auto', padding: '10px 14px' }}>
+                            {serial.length === 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 10, opacity: 0.4 }}>
+                                    <span style={{ fontSize: 28 }}>📟</span>
+                                    <span style={{ fontSize: 12, color: '#1a3a1a', fontFamily: 'monospace' }}>
+                                        {allDone ? 'Click ▶ Run to start...' : 'Wire all pins first...'}
+                                    </span>
+                                </div>
+                            ) : serial.map((l, i) => (
+                                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 4 }}>
+                                    <span style={{ color: '#1a4a1a', fontSize: 11, fontFamily: 'monospace', flexShrink: 0, marginTop: 2 }}>›</span>
+                                    <span style={{ fontSize: 11, lineHeight: 1.8, fontFamily: 'monospace', color: i === serial.length - 1 ? '#4ade80' : '#16a34a' }}>{l}</span>
                                 </div>
                             ))}
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    {/* Serial tab */}
-                    {tab === 'serial' && (
-                        <div ref={serEl} style={{ flex: 1, overflowY: 'auto', padding: '8px 10px', background: '#030608' }}>
-                            {serial.length === 0
-                                ? <p style={{ fontSize: 10, color: '#0d1a0d', fontStyle: 'italic', marginTop: 8 }}>Wire all pins then click ▶ Run...</p>
-                                : serial.map((l, i) => (
-                                    <div key={i} style={{
-                                        fontSize: 10, lineHeight: 1.8, fontFamily: 'monospace',
-                                        color: i === serial.length - 1 ? '#00e676' : '#007a40'
-                                    }}>{l}</div>
-                                ))
-                            }
+                {/* ── Connections (always visible) ── */}
+                <div style={{ borderTop: '1px solid #1e2a3a', background: '#0a0f18', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 700, letterSpacing: 0.5 }}>CONNECTIONS</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ height: 4, width: 64, borderRadius: 99, background: '#1e2a3a', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', borderRadius: 99, background: connectedCount === tw ? '#4ade80' : '#3b82f6', width: `${tw > 0 ? (connectedCount/tw)*100 : 0}%`, transition: 'width .4s ease' }}/>
+                            </div>
+                            <span style={{ fontSize: 11, color: connectedCount === tw ? '#4ade80' : '#60a5fa', fontWeight: 700 }}>{connectedCount}/{tw}</span>
                         </div>
-                    )}
-
-                    {/* Wire legend */}
-                    <div style={{ borderTop: '1px solid #1a2535', padding: '8px 10px', background: '#0c1520' }}>
-                        <div style={{ fontSize: 8, color: '#1e2d40', marginBottom: 5, fontWeight: 600 }}>CONNECTIONS</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                         {steps.filter(st => st.wire).map((st, i) => {
                             if (!st.wire) return null;
                             const done = dp.has(st.wire.cpName.toUpperCase());
                             return (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-                                    <div style={{
-                                        width: 20, height: 3.5, borderRadius: 2, background: st.wire.color,
-                                        boxShadow: done ? `0 0 5px ${st.wire.color}` : 'none', flexShrink: 0
-                                    }} />
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, background: done ? `${st.wire.color}14` : 'transparent', transition: 'background .3s' }}>
+                                    <div style={{ width: 22, height: 5, borderRadius: 3, background: done ? st.wire.color : '#1e2a3a', boxShadow: done ? `0 0 6px ${st.wire.color}` : 'none', flexShrink: 0, transition: 'all .3s' }}/>
                                     {st.wire.hasR && (
-                                        <span style={{ fontSize: 7.5, color: '#c8a84b', background: '#100c00', padding: '1px 5px', borderRadius: 3 }}>220Ω</span>
+                                        <span style={{ fontSize: 8, color: '#f59e0b', background: '#1c1000', padding: '1px 5px', borderRadius: 3, border: '1px solid #92400e', fontWeight: 700, flexShrink: 0 }}>Ω</span>
                                     )}
-                                    <span style={{ fontSize: 9.5, color: done ? '#48bb78' : '#1e2d40', fontFamily: 'monospace' }}>
-                                        {st.wire.cpName} → {st.wire.epKey}
-                                    </span>
-                                    {done && <span style={{ fontSize: 10, color: '#48bb78', marginLeft: 'auto' }}>✓</span>}
+                                    <span style={{ fontSize: 11, fontFamily: 'monospace', fontWeight: 700, color: done ? '#f1f5f9' : '#334155', flexShrink: 0 }}>{st.wire.cpName}</span>
+                                    <span style={{ fontSize: 10, color: '#334155', flexShrink: 0 }}>→</span>
+                                    <span style={{ fontSize: 11, fontFamily: 'monospace', color: done ? '#60a5fa' : '#334155', flex: 1 }}>{st.wire.epKey}</span>
+                                    <span style={{ fontSize: 13, color: done ? '#4ade80' : '#1e2a3a', transition: 'color .3s' }}>{done ? '✓' : '○'}</span>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom instruction */}
-            <div style={{ background: '#0c1520', borderTop: '1px solid #1a2535', padding: '10px 16px' }}>
-                {allDone && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
-                        background: 'rgba(72,187,120,0.08)', border: '1px solid rgba(72,187,120,0.2)',
-                        borderRadius: 8, marginBottom: 10
-                    }}>
-                        <span>✅</span>
-                        <span style={{ fontSize: 11, color: '#48bb78', fontFamily: 'monospace' }}>All connections verified — click ▶ Run!</span>
-                    </div>
-                )}
-                <div style={{ display: 'flex', gap: 9, marginBottom: 10, alignItems: 'flex-start' }}>
-                    <div style={{
-                        width: 22, height: 22, minWidth: 22, borderRadius: '50%', background: '#0a2040',
-                        color: '#63b3ed', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, border: '1px solid #2b6cb0', marginTop: 1
-                    }}>
-                        {cur + 1}
-                    </div>
-                    <p style={{ fontSize: 11, color: '#718096', lineHeight: 1.7, margin: 0, fontFamily: 'monospace' }}>{s.instr}</p>
-                </div>
-                {s.wire && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                        <div style={{ height: 5, width: 28, borderRadius: 3, background: s.wire.color, boxShadow: `0 0 6px ${s.wire.color}` }} />
-                        {s.wire.hasR && (
-                            <span style={{ fontSize: 9, color: '#d69e2e', background: '#100c00', padding: '2px 8px', borderRadius: 4, border: '1px solid #744210' }}>⚡ 220Ω</span>
-                        )}
-                        <span style={{ fontSize: 10, color: '#2a3a4a', fontFamily: 'monospace' }}>{s.wire.label}</span>
-                    </div>
-                )}
-                {/* Progress dots */}
-                <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-                    {steps.map((_, i) => (
-                        <div key={i} style={{
-                            height: 4, borderRadius: 99, transition: 'width .3s',
-                            width: i === cur ? 18 : 4,
-                            background: drawn.has(i) ? '#276749' : i === cur ? '#2b6cb0' : '#1a2535'
-                        }} />
-                    ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => {
-                        if (cur === 0) return;
-                        const prevIdx = cur - 1;
-                        setDrawn(p => { const s = new Set(p); s.delete(prevIdx); return s; });
-                        setCur(prevIdx);
-                    }} disabled={cur === 0}
-                        style={{
-                            background: '#0c1520', border: '1px solid #1a2535', color: '#4a5568',
-                            fontSize: 11, padding: '8px 14px', borderRadius: 8, cursor: 'pointer',
-                            opacity: cur === 0 ? .3 : 1, fontFamily: 'monospace'
-                        }}>
-                        ← Back
-                    </button>
-                    <button onClick={next} disabled={isLast && allDone}
-                        style={{
-                            flex: 1, background: isLast && allDone ? '#0c1520' : '#0a2040',
-                            border: `1px solid ${isLast && allDone ? '#1a2535' : '#2b6cb0'}`,
-                            color: isLast && allDone ? '#2a3a4a' : '#e2e8f0',
-                            fontSize: 11, padding: '8px 0', borderRadius: 8,
-                            cursor: isLast && allDone ? 'default' : 'pointer',
-                            opacity: isLast && allDone ? .4 : 1, fontFamily: 'monospace'
-                        }}>
-                        {isLast && allDone ? '✓ Complete' : s.wire && !drawn.has(cur) ? 'Connect Wire →' : 'Next →'}
-                    </button>
-                </div>
             </div>
         </div>
-    );
+
+        {/* ── Bottom Bar ── */}
+        <div style={{ background: '#0a0f18', borderTop: '1px solid #1e2a3a', padding: '12px 16px' }}>
+
+            {/* All done banner */}
+            {allDone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(74,222,128,0.07)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 16 }}>✅</span>
+                    <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 600 }}>All connections verified — click ▶ Run to simulate!</span>
+                </div>
+            )}
+
+            {/* Instruction */}
+            {!allDone && (
+                <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
+                    <div style={{ width: 26, height: 26, minWidth: 26, borderRadius: '50%', background: '#1a2f4a', color: '#60a5fa', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, border: '1px solid #2a4a6a', flexShrink: 0, marginTop: 1 }}>
+                        {cur + 1}
+                    </div>
+                    <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.75, margin: 0 }}>{s.instr}</p>
+                </div>
+            )}
+
+            {/* Wire indicator */}
+            {s.wire && !allDone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, padding: '6px 10px', background: '#0d1525', borderRadius: 8 }}>
+                    <div style={{ height: 5, width: 28, borderRadius: 3, background: s.wire.color, boxShadow: `0 0 8px ${s.wire.color}`, flexShrink: 0 }}/>
+                    {s.wire.hasR && (
+                        <span style={{ fontSize: 10, color: '#f59e0b', background: '#1c1000', padding: '2px 8px', borderRadius: 5, border: '1px solid #92400e', fontWeight: 700 }}>⚡ 220Ω</span>
+                    )}
+                    <span style={{ fontSize: 11, color: '#64748b' }}>{s.wire.label}</span>
+                </div>
+            )}
+
+            {/* Progress dots */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+                {steps.map((_, i) => (
+                    <div key={i} style={{ height: 4, borderRadius: 99, transition: 'all .3s', width: i === cur ? 22 : 4, background: drawn.has(i) ? '#4ade80' : i === cur ? '#3b82f6' : '#1e2a3a', boxShadow: i === cur ? '0 0 8px #3b82f6' : 'none' }}/>
+                ))}
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => {
+                    if (cur === 0) return;
+                    const prevIdx = cur - 1;
+                    setDrawn(p => { const s = new Set(p); s.delete(prevIdx); return s; });
+                    setCur(prevIdx);
+                }} disabled={cur === 0}
+                    style={{ background: 'transparent', border: '1px solid #1e2a3a', color: '#64748b', fontSize: 12, fontWeight: 600, padding: '9px 18px', borderRadius: 10, cursor: cur === 0 ? 'default' : 'pointer', opacity: cur === 0 ? .25 : 1, fontFamily: 'inherit' }}>
+                    ← Back
+                </button>
+                <button onClick={next} disabled={isLast && allDone}
+                    style={{ flex: 1, background: isLast && allDone ? 'transparent' : s.wire && !drawn.has(cur) ? '#1d4ed8' : '#1a2f4a', border: `1px solid ${isLast && allDone ? '#1e2a3a' : s.wire && !drawn.has(cur) ? '#2563eb' : '#2a4a6a'}`, color: isLast && allDone ? '#334155' : '#f1f5f9', fontSize: 12, fontWeight: 700, padding: '9px 0', borderRadius: 10, cursor: isLast && allDone ? 'default' : 'pointer', opacity: isLast && allDone ? .3 : 1, fontFamily: 'inherit', transition: 'all .15s', boxShadow: s.wire && !drawn.has(cur) && !isLast ? '0 0 16px #1d4ed855' : 'none' }}>
+                    {isLast && allDone ? '✓ Complete' : s.wire && !drawn.has(cur) ? 'Connect Wire →' : 'Next →'}
+                </button>
+            </div>
+        </div>
+    </div>
+);
 }
