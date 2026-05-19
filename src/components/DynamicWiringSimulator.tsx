@@ -455,7 +455,7 @@ function HCSRBody({ running, out }: { running: boolean; out?: string }) {
                 </g>
             ))}
             <text x="84" y="105" fill="#86efac" fontSize="12" fontWeight="700" textAnchor="middle" fontFamily="monospace">HC-SR04</text>
-            <rect x="6" y="112" width="156" height="20" rx="3" fill="#010a02" stroke="#0cf30c" />
+            <rect x="6" y="112" width="156" height="20" rx="3" fill="#010a02" stroke="#2d6a2d" />
             {running && out
                 ? <text x="84" y="126" fill="#00e676" fontSize="11" fontWeight="700" textAnchor="middle" fontFamily="monospace">{out}</text>
                 : <text x="84" y="125" fill="#0a2a0a" fontSize="9" textAnchor="middle" fontFamily="monospace">-- cm</text>

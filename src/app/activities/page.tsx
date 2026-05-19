@@ -7,9 +7,9 @@ import { ACTIVITIES } from '@/lib/activitiesData';
 import { useActivityStore } from '@/store/useActivityStore';
 
 const DIFF: Record<string, { label: string; color: string; dot: string; bg: string }> = {
-  Beginner: { label: 'Easy', color: 'text-emerald-700', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border border-emerald-200' },
-  Intermediate: { label: 'Medium', color: 'text-amber-700', dot: 'bg-amber-500', bg: 'bg-amber-50 border border-amber-200' },
-  Advanced: { label: 'Hard', color: 'text-red-700', dot: 'bg-red-500', bg: 'bg-red-50 border border-red-200' },
+  Beginner:     { label: 'Easy',   color: 'text-emerald-700', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border border-emerald-200' },
+  Intermediate: { label: 'Medium', color: 'text-amber-700',   dot: 'bg-amber-500',   bg: 'bg-amber-50 border border-amber-200'     },
+  Advanced:     { label: 'Hard',   color: 'text-red-700',     dot: 'bg-red-500',     bg: 'bg-red-50 border border-red-200'         },
 };
 
 const FILTERS = ['All', 'Beginner', 'Intermediate', 'Advanced'] as const;
@@ -18,12 +18,15 @@ type Filter = typeof FILTERS[number];
 export default function ActivitiesPage() {
   const router = useRouter();
   const { isCompleted, getProgress } = useActivityStore();
+
   const [completedCount, setCompletedCount] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<Filter>('All');
   const [search, setSearch] = useState('');
 
   useEffect(() => {
     setCompletedCount(ACTIVITIES.filter((a) => isCompleted(a.id)).length);
+    setMounted(true);
   }, []);
 
   const filtered = ACTIVITIES.filter((a) => {
@@ -34,8 +37,7 @@ export default function ActivitiesPage() {
     return matchFilter && matchSearch;
   });
 
-  const totalDone = completedCount;
-  const pct = Math.round((totalDone / ACTIVITIES.length) * 100);
+  const pct = Math.round((completedCount / ACTIVITIES.length) * 100);
 
   return (
     <main className="min-h-screen bg-[#f0f2f5]">
@@ -43,7 +45,7 @@ export default function ActivitiesPage() {
 
       <div className="mx-auto max-w-6xl px-6 py-10">
 
-        {/* ── Hero Header ── */}
+        {/* Hero Header */}
         <div className="mb-8 overflow-hidden rounded-3xl bg-[#1a2d45]">
           <div className="px-8 py-8">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -61,13 +63,13 @@ export default function ActivitiesPage() {
               {/* Stats */}
               <div className="flex flex-wrap gap-3">
                 {[
-                  { label: 'Projects', value: ACTIVITIES.length, color: 'text-white' },
-                  { label: 'Completed', value: completedCount, color: 'text-emerald-400' },
-                  { label: 'Easy', value: ACTIVITIES.filter(a => a.difficulty === 'Beginner').length, color: 'text-emerald-300' },
-                  { label: 'Medium', value: ACTIVITIES.filter(a => a.difficulty === 'Intermediate').length, color: 'text-amber-300' },
-                  { label: 'Hard', value: ACTIVITIES.filter(a => a.difficulty === 'Advanced').length, color: 'text-red-300' },
+                  { label: 'Projects',  value: ACTIVITIES.length,                                              color: 'text-white'       },
+                  { label: 'Completed', value: mounted ? completedCount : 0,                                   color: 'text-emerald-400' },
+                  { label: 'Easy',      value: ACTIVITIES.filter(a => a.difficulty === 'Beginner').length,     color: 'text-emerald-300' },
+                  { label: 'Medium',    value: ACTIVITIES.filter(a => a.difficulty === 'Intermediate').length, color: 'text-amber-300'   },
+                  { label: 'Hard',      value: ACTIVITIES.filter(a => a.difficulty === 'Advanced').length,     color: 'text-red-300'     },
                 ].map((s) => (
-                  <div key={s.label} className="min-w-[60px] rounded-2xl bg-white/8 px-4 py-3 text-center backdrop-blur">
+                  <div key={s.label} className="min-w-[60px] rounded-2xl bg-white/10 px-4 py-3 text-center">
                     <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
                     <p className="text-[10px] text-white/30">{s.label}</p>
                   </div>
@@ -75,50 +77,47 @@ export default function ActivitiesPage() {
               </div>
             </div>
 
-            {/* Overall progress */}
-            {completedCount > 0 && (
-              <div className="mt-6 rounded-2xl bg-white/8 px-5 py-4">
+            {/* Overall progress — only after mount */}
+            {mounted && completedCount > 0 && (
+              <div className="mt-6 rounded-2xl bg-white/10 px-5 py-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-white/50">Overall Progress</span>
-                  <span className="text-[11px] font-extrabold text-emerald-400">{totalDone}/{ACTIVITIES.length} completed</span>
+                  <span className="text-[11px] font-extrabold text-emerald-400">{completedCount}/{ACTIVITIES.length} completed</span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-emerald-400 transition-all duration-700"
-                    style={{ width: `${pct}%` }}
-                  />
+                  <div className="h-full rounded-full bg-emerald-400 transition-all duration-700" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* ── Search + Filters ── */}
+        {/* Search + Filters */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Filter pills */}
           <div className="flex gap-2">
             {FILTERS.map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
-                className={`rounded-xl px-4 py-2 text-[12px] font-bold transition-all duration-200 ${filter === f
+                className={`rounded-xl px-4 py-2 text-[12px] font-bold transition-all duration-200 ${
+                  filter === f
                     ? 'bg-[#1a2d45] text-white shadow-sm'
                     : 'bg-white text-gray-400 hover:text-[#1a2d45] shadow-sm'
-                  }`}
+                }`}
               >
                 {f}
-                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
-                  }`}>
+                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
+                  filter === f ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                }`}>
                   {f === 'All' ? ACTIVITIES.length : ACTIVITIES.filter(a => a.difficulty === f).length}
                 </span>
               </button>
             ))}
           </div>
 
-          {/* Search */}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[13px]">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-gray-400">🔍</span>
             <input
               type="text"
               value={search}
@@ -138,7 +137,7 @@ export default function ActivitiesPage() {
           </div>
         </div>
 
-        {/* ── No results ── */}
+        {/* No results */}
         {filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">
             <p className="text-4xl">🔍</p>
@@ -153,11 +152,11 @@ export default function ActivitiesPage() {
           </div>
         )}
 
-        {/* ── Cards grid ── */}
+        {/* Cards grid */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((activity, idx) => {
-            const done = isCompleted(activity.id);
-            const progress = getProgress(activity.id, 5);
+            const done = mounted && isCompleted(activity.id);
+            const progress = mounted ? getProgress(activity.id, 5) : 0;
             const diff = DIFF[activity.difficulty] ?? DIFF.Beginner;
 
             return (
@@ -165,11 +164,11 @@ export default function ActivitiesPage() {
                 key={activity.id}
                 type="button"
                 onClick={() => router.push(`/activities/${activity.id}`)}
-                className={`group relative flex flex-col rounded-2xl bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${done ? 'ring-2 ring-emerald-200' : 'hover:ring-1 hover:ring-[#1a2d45]/10'
-                  }`}
-                style={{ animationDelay: `${idx * 40}ms` }}
+                className={`group relative flex flex-col rounded-2xl bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                  done ? 'ring-2 ring-emerald-200' : 'hover:ring-1 hover:ring-[#1a2d45]/10'
+                }`}
               >
-                {/* Top row — icon + badges */}
+                {/* Top row */}
                 <div className="mb-4 flex items-start justify-between">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f0f4f8] text-3xl shadow-inner">
                     {activity.icon}
@@ -216,8 +215,7 @@ export default function ActivitiesPage() {
                 {/* Tags */}
                 <div className="mt-3 flex flex-wrap gap-1">
                   {activity.tags.map((tag) => (
-                    <span key={tag}
-                      className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
+                    <span key={tag} className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
                       {tag}
                     </span>
                   ))}
@@ -237,8 +235,7 @@ export default function ActivitiesPage() {
                 {/* Teaches */}
                 <div className="mt-2.5 flex flex-wrap gap-1">
                   {activity.teaches.slice(0, 3).map((t) => (
-                    <span key={t}
-                      className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                    <span key={t} className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                       {t}
                     </span>
                   ))}
