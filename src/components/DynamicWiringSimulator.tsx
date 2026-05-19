@@ -1198,7 +1198,7 @@ function Board({ step, doneKeys, running }: {
                 x="156"
                 y="74"
                 fill="#111827"
-                fontSize="8"
+                fontSize="10"
                 fontWeight="700"
                 textAnchor="middle"
                 fontFamily="Inter"
@@ -1211,7 +1211,8 @@ function Board({ step, doneKeys, running }: {
                 x="156"
                 y="86"
                 fill="#1a1a1a"
-                fontSize="5.5"
+                fontSize=""
+                fontWeight="500"
                 textAnchor="middle"
                 fontFamily="Inter"
             >
@@ -1694,8 +1695,7 @@ export default function DynamicWiringSimulator({ component }: { component: Compo
                 onMouseEnter={e => (e.currentTarget.style.background = '#3b82f6')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#1e2a3a')}
             />
-
-            {/* Right: Panels */}
+           {/* Right: Panels */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#0a0f18' }}>
 
                 {/* Tab bar */}
