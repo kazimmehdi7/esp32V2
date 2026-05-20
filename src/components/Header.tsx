@@ -1,10 +1,33 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <header className="bg-[#2E4862] text-white h-14 flex items-center justify-between px-8 shadow-md">
@@ -65,17 +88,33 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Right side: Badge chips */}
+      {/* Right side: Badge chips / Profile */}
       <div className="flex items-center gap-2">
-        <span className="bg-white text-[#2E4862] px-3 py-1 rounded-full text-xs font-poppins font-medium">
-          ESP32
-        </span>
-        <span className="bg-white text-[#2E4862] px-3 py-1 rounded-full text-xs font-poppins font-medium">
-          Arduino
-        </span>
-        <span className="bg-white text-[#2E4862] px-3 py-1 rounded-full text-xs font-poppins font-medium">
-          IoT Ready
-        </span>
+        {user ? (
+          <>
+            <span className="bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-poppins font-medium">
+              {user.email?.split('@')[0]}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-full text-xs font-poppins font-medium transition-colors"
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="bg-white text-[#2E4862] px-3 py-1 rounded-full text-xs font-poppins font-medium">
+              ESP32
+            </span>
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1 rounded-full text-xs font-poppins font-bold transition-colors"
+            >
+              Sign In
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

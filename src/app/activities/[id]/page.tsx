@@ -5,9 +5,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
-import { ACTIVITIES } from '@/lib/activitiesData';
 import { useAppStore } from '@/store/useAppStore';
 import { useActivityStore } from '@/store/useActivityStore';
 import { useSimulatorStore } from '@/store/useSimulatorStore';
@@ -15,6 +14,8 @@ import { runLoop, stopSimulation } from '@/lib/simulatorEngine';
 import { deriveHardwareLayout } from '@/lib/hardwareParser';
 import HardwareBoard from '@/components/HardwareBoard';
 import DynamicWiringSimulator from '@/components/DynamicWiringSimulator';
+import { createClient } from '@/utils/supabase/client';
+import type { Activity } from '@/types/activity';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -32,16 +33,6 @@ const DIFF_CONFIG: Record<string, { label: string; color: string; stars: string 
   Intermediate: { label: 'Medium', color: 'bg-amber-100 text-amber-700', stars: '⭐⭐' },
   Advanced: { label: 'Hard', color: 'bg-red-100 text-red-700', stars: '⭐⭐⭐' },
 };
-
-const CARD_COLORS = [
-  { border: 'hover:border-blue-400', shadow: 'hover:shadow-blue-100', badge: 'bg-blue-500' },
-  { border: 'hover:border-violet-400', shadow: 'hover:shadow-violet-100', badge: 'bg-violet-500' },
-  { border: 'hover:border-emerald-400', shadow: 'hover:shadow-emerald-100', badge: 'bg-emerald-500' },
-  { border: 'hover:border-orange-400', shadow: 'hover:shadow-orange-100', badge: 'bg-orange-500' },
-  { border: 'hover:border-pink-400', shadow: 'hover:shadow-pink-100', badge: 'bg-pink-500' },
-  { border: 'hover:border-amber-400', shadow: 'hover:shadow-amber-100', badge: 'bg-amber-500' },
-  { border: 'hover:border-red-400', shadow: 'hover:shadow-red-100', badge: 'bg-red-500' },
-];
 
 // ─── Animated Step Content Wrapper ───────────────────────────────────────────
 
@@ -217,7 +208,7 @@ function IntroStep({ activity }: { activity: any }) {
               {activity.difficulty} Project
             </span>
           </div>
-          <h2 className="text-xl font-extrabold leading-snug">{activity.intro.headline}</h2>
+          <h2 className="text-xl font-extrabold leading-snug">{activity.intro_headline}</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
               ⏱ {activity.duration}
@@ -240,14 +231,14 @@ function IntroStep({ activity }: { activity: any }) {
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1a2d45] text-sm">🎯</div>
             <h3 className="font-extrabold text-[#1a2d45]">What you will build</h3>
           </div>
-          <p className="text-sm leading-relaxed text-gray-500">{activity.intro.what}</p>
+          <p className="text-sm leading-relaxed text-gray-500">{activity.intro_what}</p>
         </div>
         <div className="group rounded-2xl border-2 border-dashed border-[#1a2d45]/20 bg-white p-5 shadow-sm transition-all duration-200 hover:border-[#1a2d45]/40 hover:shadow-md">
           <div className="mb-3 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-400 text-sm">💡</div>
             <h3 className="font-extrabold text-[#1a2d45]">Why this matters</h3>
           </div>
-          <p className="text-sm leading-relaxed text-gray-500">{activity.intro.why}</p>
+          <p className="text-sm leading-relaxed text-gray-500">{activity.intro_why}</p>
         </div>
       </div>
 
@@ -277,7 +268,6 @@ function IntroStep({ activity }: { activity: any }) {
 function EquipmentStep({ activity }: { activity: any }) {
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="rounded-3xl bg-[#1a2d45] p-6 text-white">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/20 text-xl">🔧</div>
@@ -288,12 +278,11 @@ function EquipmentStep({ activity }: { activity: any }) {
         </div>
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2.5">
           <p className="text-[11px] font-semibold text-white/80">
-            🛒 {activity.equipment.length} items needed — All of them are available in "Build Mind" mediatiz foundation kit.
+            🛒 {activity.equipment.length} items needed
           </p>
         </div>
       </div>
 
-      {/* Equipment list — clean rows, no images, no emoji */}
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
         <div className="divide-y divide-gray-100">
           {activity.equipment.map((item: any, idx: number) => (
@@ -302,7 +291,6 @@ function EquipmentStep({ activity }: { activity: any }) {
               className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-[#f8f9fb]"
             >
               <div className="flex items-center gap-4">
-                {/* Index number */}
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1a2d45] text-[11px] font-bold text-white">
                   {idx + 1}
                 </div>
@@ -311,20 +299,12 @@ function EquipmentStep({ activity }: { activity: any }) {
                   <p className="text-[11px] text-gray-400">{item.description}</p>
                 </div>
               </div>
-              {/* Quantity badge */}
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-extrabold text-amber-700">
                 {item.quantity}
               </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Tip */}
-      <div className="flex items-start gap-3 rounded-2xl border-2 border-blue-100 bg-blue-50 p-4">
-        <p className="text-[11px] font-semibold leading-relaxed text-blue-700">
-          💡 Search for an &quot;ESP32 Starter Kit&quot; on Amazon or AliExpress — usually includes most parts in one box!
-        </p>
       </div>
     </div>
   );
@@ -338,7 +318,6 @@ function AssembleStep({ activity }: { activity: any }) {
 
   return (
     <div className="space-y-4">
-      {/* Tab selector */}
       <div className="flex gap-1.5 rounded-2xl bg-[#f0f2f5] p-1.5">
         {[
           ...(hasWiring ? [{ id: 'wiring' as const, label: '🔌 Wire It Up' }] : []),
@@ -358,12 +337,10 @@ function AssembleStep({ activity }: { activity: any }) {
         ))}
       </div>
 
-      {/* Wiring Simulator */}
       {view === 'wiring' && activity.wiringComponent && (
         <DynamicWiringSimulator component={activity.wiringComponent} />
       )}
 
-      {/* Video */}
       {view === 'video' && (
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
           <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
@@ -379,7 +356,6 @@ function AssembleStep({ activity }: { activity: any }) {
         </div>
       )}
 
-      {/* Wiring Steps */}
       <div className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#1a2d45] text-sm">🛠️</div>
@@ -409,10 +385,6 @@ function CodeStep({ activity }: { activity: any }) {
   const addBlock = useAppStore((s) => s.addBlock);
   const [tab, setTab] = useState<'platform' | 'arduino'>('platform');
   const [copied, setCopied] = useState(false);
-  const [showAi, setShowAi] = useState(false);
-  const [aiQ, setAiQ] = useState('');
-  const [aiA, setAiA] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(activity.code.arduino);
@@ -428,29 +400,8 @@ function CodeStep({ activity }: { activity: any }) {
     router.push('/');
   };
 
-  const askAi = async () => {
-    if (!aiQ.trim()) return;
-    setAiLoading(true); setAiA('');
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-          system: `You help kids learn ESP32. Project: ${activity.title}. Code: ${activity.code.arduino}. Expected: ${activity.output.expected.join(', ')}. Be friendly, simple, concise.`,
-          messages: [{ role: 'user', content: aiQ }],
-        }),
-      });
-      const d = await res.json();
-      setAiA(d.content?.map((c: any) => c.text || '').join('') || 'No response.');
-    } catch { setAiA('Something went wrong. Try again!'); }
-    finally { setAiLoading(false); }
-  };
-
   return (
     <div className="space-y-4">
-
-      {/* ── Tab switcher ── */}
       <div className="flex gap-1.5 rounded-2xl bg-[#f0f2f5] p-1.5">
         {([
           { id: 'platform', label: '🧩 Our Platform' },
@@ -465,11 +416,8 @@ function CodeStep({ activity }: { activity: any }) {
         ))}
       </div>
 
-      {/* ── Platform tab ── */}
       {tab === 'platform' && (
         <div className="space-y-3">
-
-          {/* Description card */}
           <div className="rounded-2xl bg-white p-5 shadow-sm">
             <div className="flex items-start gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1a2d45] text-lg">🧩</div>
@@ -479,68 +427,27 @@ function CodeStep({ activity }: { activity: any }) {
               </div>
             </div>
           </div>
-
-          {/* Blocks grid */}
-          <div className="rounded-2xl bg-white p-5 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide">
-                {activity.playgroundBlocks?.length ?? 0} Blocks
-              </p>
-              <button type="button" onClick={openPlayground}
-                className="flex items-center gap-1.5 rounded-xl bg-[#1a2d45] px-4 py-2 text-[11px] font-bold text-white transition-all hover:bg-[#243d5a] active:scale-95">
-                Open Full →
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {activity.playgroundBlocks?.map((b: any, i: number) => (
-                <div key={i} className="flex items-center gap-2.5 rounded-xl border border-gray-100 bg-[#f8f9fb] px-3 py-2.5">
-                  <span className="text-base">{b.icon}</span>
-                  <div>
-                    <p className="text-[10px] font-bold text-[#1a2d45]">{b.type}</p>
-                    <p className="text-[9px] text-gray-400 truncate max-w-[80px]">{b.label?.replace(/<[^>]+>/g, '…')}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Inline simulator */}
           <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <p className="text-[11px] font-bold text-[#1a2d45]">▶ Run it here</p>
-              <span className="text-[10px] text-gray-400">No upload needed</span>
             </div>
             <div className="p-4">
               <InlineSimulator activity={activity} />
             </div>
           </div>
-
         </div>
       )}
 
-      {/* ── Arduino tab ── */}
       {tab === 'arduino' && (
         <div className="overflow-hidden rounded-2xl bg-[#020508] shadow-sm">
           <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                {['bg-red-400','bg-yellow-400','bg-emerald-400'].map(c=>(
-                  <div key={c} className={`h-2.5 w-2.5 rounded-full ${c}`}/>
-                ))}
-              </div>
-              <span className="text-[10px] text-white/25 font-mono">{activity.title}.ino</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-white/20">
-                {activity.code.arduino.split('\n').length} lines
-              </span>
-              <button type="button" onClick={handleCopy}
+            <span className="text-[10px] text-white/25 font-mono">{activity.title}.ino</span>
+            <button type="button" onClick={handleCopy}
                 className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all duration-200 ${
                   copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/8 text-white/40 hover:bg-white/15 hover:text-white/70'
                 }`}>
                 {copied ? '✓ Copied!' : '📋 Copy'}
-              </button>
-            </div>
+            </button>
           </div>
           <div className="overflow-auto p-5">
             <pre className="text-[11px] leading-relaxed text-emerald-300">
@@ -549,78 +456,6 @@ function CodeStep({ activity }: { activity: any }) {
           </div>
         </div>
       )}
-
-      {/* ── AI Assistant ── */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <button type="button" onClick={() => setShowAi(!showAi)}
-          className="flex w-full items-center justify-between px-5 py-4 transition-colors hover:bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-100 text-lg">✨</div>
-            <div className="text-left">
-              <p className="text-[13px] font-extrabold text-[#1a2d45]">Ask AI for help</p>
-              <p className="text-[10px] text-gray-400">Stuck? Ask anything about this project</p>
-            </div>
-          </div>
-          <div className={`flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[11px] text-gray-400 transition-transform duration-200 ${showAi ? 'rotate-180' : ''}`}>
-            ▼
-          </div>
-        </button>
-
-        {showAi && (
-          <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-3">
-
-            {/* Quick suggestions */}
-            <div className="flex flex-wrap gap-2">
-              {[
-                'Why is nothing happening?',
-                'What does this line do?',
-                'How do I change the speed?',
-              ].map((q) => (
-                <button key={q} type="button" onClick={() => setAiQ(q)}
-                  className="rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-600 transition-colors hover:bg-violet-100">
-                  {q}
-                </button>
-              ))}
-            </div>
-
-            {/* Input row */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={aiQ}
-                onChange={(e) => setAiQ(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && askAi()}
-                placeholder="Ask anything about this project..."
-                className="flex-1 rounded-xl border border-gray-200 bg-[#f4f6f9] px-4 py-2.5 text-[11px] text-gray-700 outline-none transition-colors focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              />
-              <button type="button" onClick={askAi}
-                disabled={aiLoading || !aiQ.trim()}
-                className="rounded-xl bg-violet-500 px-4 py-2 text-[11px] font-bold text-white transition-all hover:bg-violet-600 disabled:opacity-30 active:scale-95">
-                {aiLoading ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"/>
-                  </span>
-                ) : 'Ask'}
-              </button>
-            </div>
-
-            {/* Response */}
-            {aiA && (
-              <div className="overflow-hidden rounded-xl border border-violet-100 bg-violet-50">
-                <div className="flex items-center gap-2 border-b border-violet-100 px-4 py-2.5">
-                  <span className="text-violet-400 text-sm">✨</span>
-                  <p className="text-[10px] font-bold text-violet-500">AI Assistant</p>
-                </div>
-                <div className="p-4">
-                  <pre className="whitespace-pre-wrap text-[11px] leading-relaxed text-gray-700">{aiA}</pre>
-                </div>
-              </div>
-            )}
-
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }
@@ -630,126 +465,19 @@ function CodeStep({ activity }: { activity: any }) {
 function OutputStep({ activity }: { activity: any }) {
   return (
     <div className="space-y-4">
-
-      {/* Header */}
       <div className="rounded-3xl bg-[#1a2d45] px-7 py-6 text-white">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-2xl">📊</div>
-          <div>
-            <h2 className="text-lg font-extrabold">Expected Output</h2>
-            <p className="mt-0.5 text-[12px] text-white/50">{activity.output.description}</p>
-          </div>
-        </div>
+        <h2 className="text-lg font-extrabold">Expected Output</h2>
+        <p className="mt-0.5 text-[12px] text-white/50">{activity.output.description}</p>
       </div>
-
-      {/* Serial Monitor */}
       <div className="overflow-hidden rounded-2xl bg-[#020508] shadow-sm">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1.5">
-              {['bg-red-400', 'bg-yellow-400', 'bg-emerald-400'].map(c => (
-                <div key={c} className={`h-3 w-3 rounded-full ${c}`} />
-              ))}
-            </div>
-            <p className="text-[10px] font-semibold text-white/20">Serial Monitor — 115200 baud</p>
-          </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            Live
-          </span>
-        </div>
-        {/* Output lines */}
         <div className="space-y-0.5 p-5">
           {activity.output.expected.map((line: string, idx: number) => (
-            <div key={idx} className="flex items-start gap-2 font-mono text-[11px]">
-              {line.startsWith('(') ? (
-                <span className="italic text-white/20">{line}</span>
-              ) : (
-                <>
-                  <span className="mt-0.5 shrink-0 text-white/20">›</span>
-                  <span className={`${idx === 0 ? 'text-white/60' : 'text-emerald-400'}`}>{line}</span>
-                </>
-              )}
-            </div>
+            <p key={idx} className="font-mono text-[11px] text-emerald-400">
+              <span className="mr-2 text-white/20">{'>'}</span>{line}
+            </p>
           ))}
         </div>
       </div>
-
-      {/* Troubleshooting */}
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-400 text-base shadow-sm">🔍</div>
-            <div>
-              <h3 className="font-extrabold text-[#1a2d45]">Troubleshooting Tips</h3>
-              <p className="text-[10px] text-gray-400">{activity.output.tips.length} common issues</p>
-            </div>
-          </div>
-          <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-[10px] font-bold text-amber-600">
-            If stuck
-          </span>
-        </div>
-
-        {/* Tips */}
-        <div className="divide-y divide-gray-50">
-          {activity.output.tips.map((tip: string, idx: number) => (
-            <div key={idx}
-              className="group flex items-start gap-4 px-5 py-4 transition-all duration-150 hover:bg-amber-50"
-            >
-              {/* Number */}
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[10px] font-extrabold text-amber-600 mt-0.5 group-hover:bg-amber-400 group-hover:text-white transition-colors duration-150">
-                {idx + 1}
-              </div>
-              <p className="text-[11px] leading-relaxed text-gray-600 group-hover:text-gray-800 transition-colors duration-150">
-                {tip}
-              </p>
-            </div>
-          ))}
-        </div>
-
-      </div>
-
-      {/* Bonus Challenge */}
-      {activity.bonusChallenge && (
-        <div className="rounded-2xl border-2 border-dashed border-violet-200 bg-violet-50 p-5 transition-all hover:border-violet-300 hover:bg-violet-100/50">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500 text-sm">🚀</div>
-            <h3 className="font-extrabold text-violet-800">Bonus Challenge</h3>
-            <span className="rounded-full bg-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-600">Optional</span>
-          </div>
-          <p className="text-[12px] leading-relaxed text-violet-700">{activity.bonusChallenge}</p>
-        </div>
-      )}
-
-      {/* Completion card */}
-      <div className="relative overflow-hidden rounded-3xl bg-[#1a2d45] p-7 text-white">
-        <div className="pointer-events-none absolute -bottom-8 -right-8 select-none text-[120px] opacity-[0.06]">🎉</div>
-        <div className="pointer-events-none absolute -top-8 -left-8 select-none text-[80px] opacity-[0.04]">⚡</div>
-        <div className="relative">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-400/15 px-3 py-1.5">
-            <span>🏆</span>
-            <span className="text-[11px] font-bold text-emerald-300">Almost Done!</span>
-          </div>
-          <h3 className="text-2xl font-extrabold">Project Complete!</h3>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-white/50">
-            You built <span className="font-bold text-white">{activity.title}</span>! Click Done to save your progress and unlock the next project.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <a href="/activities"
-              className="rounded-xl bg-white/10 px-5 py-2.5 text-[11px] font-bold transition-all hover:bg-white/20">
-              ← More Activities
-            </a>
-            <a href="/"
-              className="rounded-xl bg-amber-400 px-5 py-2.5 text-[11px] font-bold text-[#1a2d45] transition-all hover:bg-amber-300 hover:scale-[1.02] active:scale-95">
-              Open Simulator →
-            </a>
-          </div>
-        </div>
-      </div>
-
     </div>
   );
 }
@@ -762,8 +490,6 @@ function useConfetti() {
     if (typeof window !== 'undefined' && (window as any).confetti) {
       const c = (window as any).confetti;
       c({ spread: 60, startVelocity: 45, particleCount: 60, colors, origin: { y: 0.6 } });
-      setTimeout(() => c({ spread: 100, decay: 0.91, scalar: 0.8, particleCount: 40, colors, origin: { y: 0.6 } }), 150);
-      setTimeout(() => c({ spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2, particleCount: 30, colors, origin: { y: 0.6 } }), 300);
     }
   };
   return { fire };
@@ -771,21 +497,38 @@ function useConfetti() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ActivityDetailPage({ params }: { params: { id: string } }) {
+export default function ActivityDetailPage() {
+  const { id: activityId } = useParams() as { id: string };
   const router = useRouter();
-  const activity = ACTIVITIES.find((a) => a.id === params.id);
-  const { markStepComplete, markActivityComplete, getLastStep, isCompleted } = useActivityStore();
+  const { initialize, markStepComplete, markActivityComplete, getLastStep, isCompleted } = useActivityStore();
   const { fire: fireConfetti } = useConfetti();
 
+  const [activity, setActivity] = useState<Activity | undefined>(undefined);
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<number[]>([]);
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
 
+  // Load activity and initialize step state
   useEffect(() => {
-    const last = getLastStep(params.id);
-    setCurrentStep(last);
-    setCompleted(Array.from({ length: last }, (_, i) => i));
-  }, [params.id]);
+    // Initialize store with authenticated user ID and activity count
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      // Fetch all activities from the API
+      const res = await fetch('/api/activities');
+      const data = await res.json();
+      const act = data.find((a: any) => a.id === activityId);
+      setActivity(act);
+
+      // Initialize step progress from store
+      const last = getLastStep(activityId);
+      setCurrentStep(last);
+      setCompleted(Array.from({ length: last }, (_, i) => i));
+    };
+    load();
+  }, [activityId]);
 
   useEffect(() => {
     const s = document.createElement('script');

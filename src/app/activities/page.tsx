@@ -1,15 +1,17 @@
+// src/app/activities/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import { ACTIVITIES } from '@/lib/activitiesData';
 import { useActivityStore } from '@/store/useActivityStore';
+import { type Activity } from '@/types/activity';
+import { createClient } from '@/utils/supabase/client';
 
 const DIFF: Record<string, { label: string; color: string; dot: string; bg: string }> = {
-  Beginner:     { label: 'Easy',   color: 'text-emerald-700', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border border-emerald-200' },
-  Intermediate: { label: 'Medium', color: 'text-amber-700',   dot: 'bg-amber-500',   bg: 'bg-amber-50 border border-amber-200'     },
-  Advanced:     { label: 'Hard',   color: 'text-red-700',     dot: 'bg-red-500',     bg: 'bg-red-50 border border-red-200'         },
+  Beginner: { label: 'Easy', color: 'text-emerald-700', dot: 'bg-emerald-500', bg: 'bg-emerald-50 border border-emerald-200' },
+  Intermediate: { label: 'Medium', color: 'text-amber-700', dot: 'bg-amber-500', bg: 'bg-amber-50 border border-amber-200' },
+  Advanced: { label: 'Hard', color: 'text-red-700', dot: 'bg-red-500', bg: 'bg-red-50 border border-red-200' },
 };
 
 const FILTERS = ['All', 'Beginner', 'Intermediate', 'Advanced'] as const;
@@ -17,34 +19,53 @@ type Filter = typeof FILTERS[number];
 
 export default function ActivitiesPage() {
   const router = useRouter();
-  const { isCompleted, getProgress } = useActivityStore();
+  const { isCompleted, getProgress, initialize } = useActivityStore();
 
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<Filter>('All');
   const [search, setSearch] = useState('');
 
+  // Load user + activities data on mount
   useEffect(() => {
-    setCompletedCount(ACTIVITIES.filter((a) => isCompleted(a.id)).length);
-    setMounted(true);
+    const load = async () => {
+      // get logged‑in user
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) {
+        await initialize(user.id);
+      }
+      // fetch activities from our protected API route
+      const res = await fetch('/api/activities');
+      const data = await res.json();
+      setActivities(data);
+      // compute completed count once activities are loaded
+      if (user?.id) {
+        const count = data.filter((a: Activity) => isCompleted(a.id)).length;
+        setCompletedCount(count);
+      }
+      setMounted(true);
+    };
+    load();
   }, []);
 
-  const filtered = ACTIVITIES.filter((a) => {
+  const filtered = activities.filter((a) => {
     const matchFilter = filter === 'All' || a.difficulty === filter;
-    const matchSearch = search === '' ||
+    const matchSearch =
+      search === '' ||
       a.title.toLowerCase().includes(search.toLowerCase()) ||
-      a.tags.some(t => t.toLowerCase().includes(search.toLowerCase()));
+      a.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
     return matchFilter && matchSearch;
   });
 
-  const pct = Math.round((completedCount / ACTIVITIES.length) * 100);
+  const pct = activities.length ? Math.round((completedCount / activities.length) * 100) : 0;
 
   return (
     <main className="min-h-screen bg-[#f0f2f5]">
       <Header />
 
       <div className="mx-auto max-w-6xl px-6 py-10">
-
         {/* Hero Header */}
         <div className="mb-8 overflow-hidden rounded-3xl bg-[#1a2d45]">
           <div className="px-8 py-8">
@@ -63,11 +84,11 @@ export default function ActivitiesPage() {
               {/* Stats */}
               <div className="flex flex-wrap gap-3">
                 {[
-                  { label: 'Projects',  value: ACTIVITIES.length,                                              color: 'text-white'       },
-                  { label: 'Completed', value: mounted ? completedCount : 0,                                   color: 'text-emerald-400' },
-                  { label: 'Easy',      value: ACTIVITIES.filter(a => a.difficulty === 'Beginner').length,     color: 'text-emerald-300' },
-                  { label: 'Medium',    value: ACTIVITIES.filter(a => a.difficulty === 'Intermediate').length, color: 'text-amber-300'   },
-                  { label: 'Hard',      value: ACTIVITIES.filter(a => a.difficulty === 'Advanced').length,     color: 'text-red-300'     },
+                  { label: 'Projects', value: activities.length, color: 'text-white' },
+                  { label: 'Completed', value: mounted ? completedCount : 0, color: 'text-emerald-400' },
+                  { label: 'Easy', value: activities.filter((a) => a.difficulty === 'Beginner').length, color: 'text-emerald-300' },
+                  { label: 'Medium', value: activities.filter((a) => a.difficulty === 'Intermediate').length, color: 'text-amber-300' },
+                  { label: 'Hard', value: activities.filter((a) => a.difficulty === 'Advanced').length, color: 'text-red-300' },
                 ].map((s) => (
                   <div key={s.label} className="min-w-[60px] rounded-2xl bg-white/10 px-4 py-3 text-center">
                     <p className={`text-2xl font-extrabold ${s.color}`}>{s.value}</p>
@@ -82,7 +103,9 @@ export default function ActivitiesPage() {
               <div className="mt-6 rounded-2xl bg-white/10 px-5 py-4">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-white/50">Overall Progress</span>
-                  <span className="text-[11px] font-extrabold text-emerald-400">{completedCount}/{ACTIVITIES.length} completed</span>
+                  <span className="text-[11px] font-extrabold text-emerald-400">
+                    {completedCount}/{activities.length} completed
+                  </span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full bg-emerald-400 transition-all duration-700" style={{ width: `${pct}%` }} />
@@ -101,16 +124,12 @@ export default function ActivitiesPage() {
                 type="button"
                 onClick={() => setFilter(f)}
                 className={`rounded-xl px-4 py-2 text-[12px] font-bold transition-all duration-200 ${
-                  filter === f
-                    ? 'bg-[#1a2d45] text-white shadow-sm'
-                    : 'bg-white text-gray-400 hover:text-[#1a2d45] shadow-sm'
+                  filter === f ? 'bg-[#1a2d45] text-white shadow-sm' : 'bg-white text-gray-400 hover:text-[#1a2d45] shadow-sm'
                 }`}
               >
                 {f}
-                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${
-                  filter === f ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
-                }`}>
-                  {f === 'All' ? ACTIVITIES.length : ACTIVITIES.filter(a => a.difficulty === f).length}
+                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                  {f === 'All' ? activities.length : activities.filter((a) => a.difficulty === f).length}
                 </span>
               </button>
             ))}
@@ -156,9 +175,8 @@ export default function ActivitiesPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filtered.map((activity, idx) => {
             const done = mounted && isCompleted(activity.id);
-            const progress = mounted ? getProgress(activity.id, 5) : 0;
+            const progress = mounted ? getProgress(activity.id, activity.steps?.length ?? 5) : 0;
             const diff = DIFF[activity.difficulty] ?? DIFF.Beginner;
-
             return (
               <button
                 key={activity.id}
@@ -176,10 +194,10 @@ export default function ActivitiesPage() {
                   <div className="flex flex-col items-end gap-1.5">
                     {done && (
                       <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-extrabold text-white">
-                         Done
+                        Done
                       </span>
                     )}
-                    <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${diff.bg} ${diff.color}`}>
+                    <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${diff.bg} ${diff.color}`}> 
                       <span className={`h-1.5 w-1.5 rounded-full ${diff.dot}`} />
                       {diff.label}
                     </span>
@@ -204,10 +222,7 @@ export default function ActivitiesPage() {
                       <span className="text-[10px] font-extrabold text-[#1a2d45]">{progress}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                      <div
-                        className="h-full rounded-full bg-[#1a2d45] transition-all duration-500"
-                        style={{ width: `${progress}%` }}
-                      />
+                      <div className="h-full rounded-full bg-[#1a2d45] transition-all duration-500" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
                 )}
@@ -253,7 +268,6 @@ export default function ActivitiesPage() {
             </div>
           </div>
         </div>
-
       </div>
     </main>
   );

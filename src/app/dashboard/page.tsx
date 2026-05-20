@@ -2,19 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import { createClient } from '@/utils/supabase/client';
+import { useActivityStore } from '@/store/useActivityStore';
+
 import { PROJECT_TEMPLATES } from '@/lib/projectTemplates';
 import { ACTIVITIES } from '@/lib/activitiesData';
 import { useAppStore } from '@/store/useAppStore';
-import { useActivityStore } from '@/store/useActivityStore';
+import Header from '@/components/Header';
+
 
 export default function DashboardPage() {
   const router = useRouter();
   const activeDeviceId = useAppStore((state) => state.activeDeviceId);
   const addBlock = useAppStore((state) => state.addBlock);
   const clearBlocks = useAppStore((state) => state.clearBlocks);
-  const { completed, streak, isCompleted } = useActivityStore();
+  const { completed, streak, lastActive, isCompleted } = useActivityStore();
   const totalActivities = ACTIVITIES.length;
+
+  // Initialize activity store with logged-in user
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        await useActivityStore.getState().initialize(session.user.id);
+        await useActivityStore.getState()._updateStreak(session.user.id);
+      }
+    };
+    init();
+  }, []);
 
   // ── Hydration fix ──
   // All localStorage-dependent values start as safe defaults on server.

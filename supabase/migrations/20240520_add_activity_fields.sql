@@ -1,0 +1,21 @@
+create table if not exists activities (
+  id text primary key,
+  title text,
+  description text,
+  difficulty text,
+  tags jsonb,
+  equipment jsonb,
+  teaches jsonb,
+  duration text,
+  steps jsonb,
+  icon text,
+  intro_headline text,
+  intro_what text,
+  intro_why text,
+  assemble jsonb,
+  code jsonb,
+  "playgroundBlocks" jsonb,
+  "output" jsonb,
+  bonusChallenge text,
+  "wiringComponent" jsonb
+);

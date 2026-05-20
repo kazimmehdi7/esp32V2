@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LECTURES_STRUCTURED_DATA, LectureSection, LectureBlock, QuizQuestion } from '@/lib/lecturesStructuredData';
+import { createClient } from '@/utils/supabase/client';
 
 interface InteractiveLectureProps {
   levelId: string | number;
@@ -753,7 +754,7 @@ function SectionCard({ sec, isRead, onToggleRead }: SectionProps) {
 }
 
 /* ─── Interactive Quiz Box ─── */
-function QuizCard({ quiz }: { quiz: QuizQuestion[] }) {
+function QuizCard({ quiz, onQuizComplete }: { quiz: QuizQuestion[], onQuizComplete?: (score: number) => void }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [showHints, setShowHints] = useState<Record<number, boolean>>({});
@@ -780,7 +781,20 @@ function QuizCard({ quiz }: { quiz: QuizQuestion[] }) {
     if (answers[qIdx] === undefined) return;
     const isCorrect = answers[qIdx] === quiz[qIdx].correct;
     playSound(isCorrect ? 'correct' : 'incorrect');
-    setRevealed(prev => ({ ...prev, [qIdx]: true }));
+    setRevealed(prev => {
+      const next = { ...prev, [qIdx]: true };
+      
+      // Calculate score based on new state
+      const nextScore = Object.entries(next).filter(
+        ([idx, done]) => done && answers[Number(idx)] === quiz[Number(idx)].correct
+      ).length;
+      
+      if (Object.keys(next).length === quiz.length) {
+        onQuizComplete?.(nextScore);
+      }
+      
+      return next;
+    });
   };
 
   const score = Object.entries(revealed).filter(
@@ -958,6 +972,8 @@ function QuizCard({ quiz }: { quiz: QuizQuestion[] }) {
 /* ─── Main Component ─── */
 export default function InteractiveLecture({ levelId, lessonId, stepId }: InteractiveLectureProps) {
   const [progress, setProgress] = useState<Set<number>>(new Set());
+  const [user, setUser] = useState<any>(null);
+  const supabase = createClient();
 
   const key = `${levelId}-${lessonId}-${stepId}`;
   const lecture = LECTURES_STRUCTURED_DATA[key];
@@ -972,9 +988,32 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
     return <span dangerouslySetInnerHTML={{ __html: processed }} />;
   };
 
-  // Reset progress when step changes
+  // Reset and fetch progress when step changes
   useEffect(() => {
-    setProgress(new Set());
+    let currentUser: any = null;
+    
+    supabase.auth.getUser().then(({ data }) => {
+      currentUser = data.user;
+      setUser(currentUser);
+      
+      if (currentUser) {
+        // Fetch saved progress
+        supabase.from('user_progress').select('read_sections').match({
+          user_id: currentUser.id,
+          level_id: levelId.toString(),
+          lesson_id: lessonId,
+          step_id: stepId
+        }).single().then(({ data, error }) => {
+          if (data && data.read_sections) {
+            setProgress(new Set(data.read_sections));
+          } else {
+            setProgress(new Set());
+          }
+        });
+      } else {
+        setProgress(new Set());
+      }
+    });
   }, [key]);
 
   if (!lecture) {
@@ -1021,6 +1060,21 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
           }
         }, 150);
       }
+      
+      // Save to Supabase asynchronously
+      if (user) {
+        supabase.from('user_progress').upsert({
+          user_id: user.id,
+          level_id: levelId.toString(),
+          lesson_id: lessonId,
+          step_id: stepId,
+          read_sections: Array.from(next),
+          completed_at: new Date().toISOString(),
+        }).then(({ error }) => {
+          if (error) console.error('Failed to save progress:', error);
+        });
+      }
+
       return next;
     });
   };
@@ -1148,7 +1202,21 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
       {/* ── Interactive Quiz Section ── */}
       {lecture.quiz && lecture.quiz.length > 0 && (
         <div className="mb-6 animate-fadeIn">
-          <QuizCard quiz={lecture.quiz} />
+          <QuizCard 
+            quiz={lecture.quiz} 
+            onQuizComplete={(score) => {
+              if (user) {
+                supabase.from('user_progress').update({ quiz_score: score }).match({
+                  user_id: user.id,
+                  level_id: levelId.toString(),
+                  lesson_id: lessonId,
+                  step_id: stepId
+                }).then(({ error }) => {
+                  if (error) console.error('Failed to save quiz score:', error);
+                });
+              }
+            }}
+          />
         </div>
       )}
 
