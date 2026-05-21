@@ -1062,18 +1062,30 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
       }
       
       // Save to Supabase asynchronously
-      if (user) {
-        supabase.from('user_progress').upsert({
-          user_id: user.id,
-          level_id: levelId.toString(),
-          lesson_id: lessonId,
-          step_id: stepId,
-          read_sections: Array.from(next),
-          completed_at: new Date().toISOString(),
-        }).then(({ error }) => {
-          if (error) console.error('Failed to save progress:', error);
-        });
+      console.log(next);
+      // Save to Supabase asynchronously
+if (user) {
+  supabase
+    .from('user_progress')
+    .upsert(
+      {
+        user_id: user.id,
+        level_id: levelId.toString(),
+        lesson_id: lessonId,
+        step_id: stepId,
+        read_sections: Array.from(next),
+        completed_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'user_id,level_id,lesson_id,step_id'
       }
+    )
+    .then(({ error }) => {
+      if (error) {
+        console.error('Failed to save progress:', error);
+      }
+    });
+}
 
       return next;
     });
