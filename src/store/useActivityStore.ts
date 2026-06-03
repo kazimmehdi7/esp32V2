@@ -1,9 +1,7 @@
 // store/useActivityStore.ts
-// DROP THIS FILE IN: src/store/useActivityStore.ts
-
 import { create } from 'zustand';
-// Removed static import; activity count will be fetched from Supabase
 import { createClient } from '@/utils/supabase/client';
+import { LEVELS } from '@/lib/lessonConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,24 +9,32 @@ type ActivityStore = {
   // Progress tracking
   completed: string[];                      // activity IDs fully completed
   stepProgress: Record<string, number>;     // { activityId: lastCompletedStep }
-  streak: number;                           // day streak
-  lastActive: string | null;               // ISO date string
-  overallProgress: number;                // overall progress percentage
-  totalActivities: number;                 // total count of activities
+  completedLessons: string[];               // lesson IDs completed e.g. ['1-1', '1-2']
+  streak: number;
+  lastActive: string | null;
+  overallProgress: number;
+  totalActivities: number;
   userId: string;
   courseId: string;
 
   // Kit subscription tracking
-  redeemedKits: string[];                   // list of redeemed courses (e.g. ['esp32'])
+  redeemedKits: string[];
   isCheckingSub: boolean;
   hasAccess: (courseId: string) => boolean;
   addRedeemedKit: (kitType: string) => void;
 
-  // Actions
+  // Sequential lesson/level access helpers
+  isLessonCompleted: (lessonId: string) => boolean;
+  isLevelCompleted: (levelId: number) => boolean;
+  canAccessLevel: (levelId: number) => boolean;
+  canAccessLesson: (levelId: number, lessonId: string) => boolean;
+  markLessonComplete: (lessonId: string) => Promise<void>;
+
+  // Activity actions
   initialize: () => Promise<void>;
   markStepComplete: (activityId: string, step: number) => Promise<void>;
   markActivityComplete: (activityId: string) => Promise<void>;
-  getProgress: (activityId: string, totalSteps: number) => number; // returns 0-100
+  getProgress: (activityId: string, totalSteps: number) => number;
   isCompleted: (activityId: string) => boolean;
   getLastStep: (activityId: string) => number;
   resetActivity: (activityId: string) => Promise<void>;
@@ -37,25 +43,38 @@ type ActivityStore = {
   _updateOverallProgress: () => Promise<void>;
 };
 
+// ─── Shared upsert payload builder ────────────────────────────────────────────
+
+const buildPayload = (state: ActivityStore, overrides: Partial<any> = {}) => ({
+  user_id: state.userId,
+  completed: state.completed,
+  step_progress: state.stepProgress,
+  completed_lessons: state.completedLessons,
+  streak: state.streak,
+  last_active: state.lastActive,
+  user_progress: state.overallProgress,
+  ...overrides,
+});
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useActivityStore = create<ActivityStore>()((set, get) => ({
   completed: [],
   stepProgress: {},
+  completedLessons: [],
   streak: 0,
   lastActive: null,
   overallProgress: 0,
   totalActivities: 0,
-  userId: '' as string,
+  userId: '',
   redeemedKits: [],
   isCheckingSub: true,
-  courseId : ''as string,
+  courseId: '',
 
-  hasAccess: (courseId: string) => {
-    return get().redeemedKits.includes(courseId);
-  },
+  // ── Kit access ──
+  hasAccess: (courseId) => get().redeemedKits.includes(courseId),
 
-  addRedeemedKit: (kitType: string) => {
+  addRedeemedKit: (kitType) => {
     set((state) => ({
       redeemedKits: state.redeemedKits.includes(kitType)
         ? state.redeemedKits
@@ -63,36 +82,75 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
     }));
   },
 
+  // ── Lesson / Level completion helpers ──
+
+  isLessonCompleted: (lessonId) => get().completedLessons.includes(lessonId),
+
+  isLevelCompleted: (levelId) => {
+    const level = LEVELS.find((l) => l.id === levelId);
+    if (!level) return false;
+    return level.lessons.every((lesson) => get().completedLessons.includes(lesson.id));
+  },
+
+  canAccessLevel: (levelId) => {
+    if (levelId === 1) return true; // Level 1 always visible (lesson 1-1 is free)
+    if (!get().hasAccess('esp32')) return false;
+    return get().isLevelCompleted(levelId - 1);
+  },
+
+  canAccessLesson: (levelId, lessonId) => {
+    // Only lesson 1-1 is free
+    if (levelId === 1 && lessonId === '1-1') return true;
+    // Everything else requires kit
+    if (!get().hasAccess('esp32')) return false;
+    const level = LEVELS.find((l) => l.id === levelId);
+    if (!level) return false;
+    const lessonIndex = level.lessons.findIndex((l) => l.id === lessonId);
+    if (lessonIndex === -1) return false;
+    if (lessonIndex === 0) {
+      // First lesson of a level needs the previous level fully done
+      return levelId === 1 ? true : get().isLevelCompleted(levelId - 1);
+    }
+    // Otherwise need the immediately preceding lesson done
+    return get().isLessonCompleted(level.lessons[lessonIndex - 1].id);
+  },
+
+  markLessonComplete: async (lessonId) => {
+    const { completedLessons, userId } = get();
+    if (completedLessons.includes(lessonId)) return;
+    const newCompletedLessons = [...completedLessons, lessonId];
+    set({ completedLessons: newCompletedLessons });
+    if (!userId) return;
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { completed_lessons: newCompletedLessons }), {
+        onConflict: 'user_id',
+      });
+    if (error) console.error('[markLessonComplete] error:', error);
+  },
+
+  // ── Initialize ──
+
   initialize: async () => {
-    // Get the current authenticated user (UUID)
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const userId = user?.id;
     if (!userId) {
-      console.warn('useActivityStore.initialize: No authenticated user found.');
       set({ isCheckingSub: false });
       return;
     }
 
-    // Fetch user activities progress
-    const { data: userData } = await supabase
-      .from('user_activities')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    // Fetch total activities count
-    const { count } = await supabase
-      .from('activities')
-      .select('id', { count: 'exact', head: true });
-
-    // Fetch active redeemed kit codes (either unexpiring/null, or expiring in the future)
-    const { data: activeCodes } = await supabase
-      .from('kit_codes')
-      .select('kit_type')
-      .eq('redeemed_by', userId)
-      .eq('is_active', true)
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+    const [{ data: userData }, { count }, { data: activeCodes }] = await Promise.all([
+      supabase.from('user_activities').select('*').eq('user_id', userId).single(),
+      supabase.from('activities').select('id', { count: 'exact', head: true }),
+      supabase
+        .from('kit_codes')
+        .select('kit_type')
+        .eq('redeemed_by', userId)
+        .eq('is_active', true)
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
+    ]);
 
     const redeemedKits = activeCodes ? activeCodes.map((c) => c.kit_type) : [];
 
@@ -101,6 +159,7 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
         userId,
         completed: userData.completed || [],
         stepProgress: userData.step_progress || {},
+        completedLessons: userData.completed_lessons || [],
         overallProgress: userData.user_progress || 0,
         streak: userData.streak || 0,
         lastActive: userData.last_active || null,
@@ -109,79 +168,40 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
         isCheckingSub: false,
       });
     } else {
-      // No user row yet – still set totalActivities and store userId
-      set({ 
-        userId, 
-        totalActivities: count ?? 0,
-        redeemedKits,
-        isCheckingSub: false
-      });
+      set({ userId, totalActivities: count ?? 0, redeemedKits, isCheckingSub: false });
     }
   },
 
-markStepComplete: async (activityId, step) => {
-  const supabase = createClient();
+  // ── Activity progress ──
 
-  const current = get().stepProgress[activityId] ?? 0;
+  markStepComplete: async (activityId, step) => {
+    const supabase = createClient();
+    const current = get().stepProgress[activityId] ?? 0;
+    if (step <= current) return;
 
-  console.log('[markStepComplete] called:', { activityId, step, current });
+    const newStepProgress = { ...get().stepProgress, [activityId]: step };
+    set({ stepProgress: newStepProgress });
 
-  if (step <= current) {
-    console.log('[markStepComplete] skipped (step not greater than current)');
-    return;
-  }
+    const { error } = await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { step_progress: newStepProgress }), { onConflict: 'user_id' });
 
-  const newStepProgress = { ...get().stepProgress, [activityId]: step };
-
-  console.log('[markStepComplete] newStepProgress:', newStepProgress);
-
-  set({ stepProgress: newStepProgress });
-
-  const payload = {
-    user_id: get().userId,
-    completed: get().completed,
-    step_progress: newStepProgress,
-    streak: get().streak,
-    last_active: get().lastActive,
-    user_progress: get().overallProgress,
-    course_id: get().courseId
-    
-  };
-
-  console.log('[markStepComplete] upsert payload:', payload);
-
-  const { data, error } = await supabase
-    .from('user_activities')
-    .upsert(payload, {
-  onConflict: 'user_id,course_id,level_id,lesson_id,step_id'
-})
-    .select();
-
-  console.log('[markStepComplete] supabase response:', { data, error });
-
-  if (error) {
-    console.error('[markStepComplete] Supabase error:', error);
-    return;
-  }
-
-  await get()._updateOverallProgress();
-},
+    if (error) {
+      console.error('[markStepComplete] Supabase error:', error);
+      return;
+    }
+    await get()._updateOverallProgress();
+  },
 
   markActivityComplete: async (activityId) => {
     const newCompleted = get().completed.includes(activityId)
       ? get().completed
       : [...get().completed, activityId];
-      
     set({ completed: newCompleted });
-    await createClient().from('user_activities').upsert({
-      user_id: get().userId,
-      completed: newCompleted,
-      step_progress: get().stepProgress,
-      streak: get().streak,
-      last_active: get().lastActive,
-      user_progress: get().overallProgress,
-    });
-    // Update daily streak after marking activity complete
+    const supabase = createClient();
+    await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { completed: newCompleted }), { onConflict: 'user_id' });
     await get()._updateStreak(get().userId);
     await get()._updateOverallProgress();
   },
@@ -193,7 +213,6 @@ markStepComplete: async (activityId, step) => {
   },
 
   isCompleted: (activityId) => get().completed.includes(activityId),
-
   getLastStep: (activityId) => get().stepProgress[activityId] ?? 0,
 
   resetActivity: async (activityId) => {
@@ -202,63 +221,54 @@ markStepComplete: async (activityId, step) => {
       Object.entries(get().stepProgress).filter(([k]) => k !== activityId)
     );
     set({ completed: newCompleted, stepProgress: newStepProgress });
-    await createClient().from('user_activities').upsert({
-      user_id: get().userId,
-      completed: newCompleted,
-      step_progress: newStepProgress,
-      streak: get().streak,
-      last_active: get().lastActive,
-      user_progress: get().overallProgress,
-    });
+    const supabase = createClient();
+    await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { completed: newCompleted, step_progress: newStepProgress }), {
+        onConflict: 'user_id',
+      });
   },
 
-  // Update streak logic
   _updateStreak: async (userId) => {
     const today = new Date().toISOString().split('T')[0];
     const { lastActive, streak } = get();
     if (lastActive === today) return;
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    const isConsecutive = lastActive === yesterday;
-    const newStreak = isConsecutive ? streak + 1 : 1;
+    const newStreak = lastActive === yesterday ? streak + 1 : 1;
     set({ lastActive: today, streak: newStreak });
-    await createClient().from('user_activities').upsert({
-      user_id: userId,
-      completed: get().completed,
-      step_progress: get().stepProgress,
-      streak: newStreak,
-      last_active: today,
-      user_progress: get().overallProgress,
-    });
+    const supabase = createClient();
+    await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { last_active: today, streak: newStreak }), {
+        onConflict: 'user_id',
+      });
   },
 
   resetAll: async () => {
-    set({ completed: [], stepProgress: {}, streak: 0, lastActive: null, overallProgress: 0 });
-    await createClient().from('user_activities').upsert({
-      user_id: get().userId,
-      completed: [],
-      step_progress: {},
-      streak: 0,
-      last_active: null,
-      user_progress: 0,
-    });
+    set({ completed: [], stepProgress: {}, completedLessons: [], streak: 0, lastActive: null, overallProgress: 0 });
+    const supabase = createClient();
+    await supabase.from('user_activities').upsert(
+      {
+        user_id: get().userId,
+        completed: [],
+        step_progress: {},
+        completed_lessons: [],
+        streak: 0,
+        last_active: null,
+        user_progress: 0,
+      },
+      { onConflict: 'user_id' }
+    );
   },
 
-  // Compute and persist overall progress (percentage of activities completed)
   _updateOverallProgress: async () => {
     const total = get().totalActivities;
     const completedCount = get().completed.length;
     const overall = total === 0 ? 0 : Math.round((completedCount / total) * 100);
     set({ overallProgress: overall });
-    // Persist to DB (using full row state to avoid resetting columns)
-    await createClient().from('user_activities').upsert({
-      user_id: get().userId,
-      completed: get().completed,
-      step_progress: get().stepProgress,
-      streak: get().streak,
-      last_active: get().lastActive,
-      user_progress: overall,
-    });
+    const supabase = createClient();
+    await supabase
+      .from('user_activities')
+      .upsert(buildPayload(get(), { user_progress: overall }), { onConflict: 'user_id' });
   },
-
-
 }));

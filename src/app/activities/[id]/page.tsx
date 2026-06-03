@@ -504,6 +504,7 @@ export default function ActivityDetailPage() {
   const { fire: fireConfetti } = useConfetti();
 
   const [activity, setActivity] = useState<Activity | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<number[]>([]);
   const [justCompleted, setJustCompleted] = useState<number | null>(null);
@@ -516,16 +517,22 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     const load = async () => {
-      // Fetch all activities from the API
-      const res = await fetch('/api/activities');
-      const data = await res.json();
-      const act = data.find((a: any) => a.id === activityId);
-      setActivity(act);
+      try {
+        // Fetch all activities from the API
+        const res = await fetch('/api/activities');
+        const data = await res.json();
+        const act = data.find((a: any) => a.id === activityId);
+        setActivity(act);
 
-      // Initialize step progress from store
-      const last = getLastStep(activityId);
-      setCurrentStep(last);
-      setCompleted(Array.from({ length: last }, (_, i) => i));
+        // Initialize step progress from store
+        const last = getLastStep(activityId);
+        setCurrentStep(last);
+        setCompleted(Array.from({ length: last }, (_, i) => i));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [activityId]);
@@ -537,6 +544,29 @@ export default function ActivityDetailPage() {
     document.body.appendChild(s);
     return () => { try { document.body.removeChild(s); } catch { } };
   }, []);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#eef1f5]">
+        <Header />
+        <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+          <div className="text-center">
+            <div className="relative mx-auto w-16 h-16 mb-6">
+              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45]/10" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45] border-t-transparent animate-spin" />
+              <div className="absolute inset-2 rounded-full border-4 border-amber-400/20" />
+              <div className="absolute inset-2 rounded-full border-4 border-amber-400 border-b-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+            </div>
+            <h2 className="text-lg font-bold text-[#1a2d45]">Loading Activity</h2>
+            <p className="mt-2 text-xs text-gray-400">Loading project details...</p>
+            <div className="mt-4 mx-auto w-48 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div className="h-full rounded-full bg-[#1a2d45] animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (!activity) {
     return (

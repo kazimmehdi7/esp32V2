@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Header from '@/components/Header';
 import { useActivityStore } from '@/store/useActivityStore';
 import { type Activity } from '@/types/activity';
@@ -25,27 +26,26 @@ export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('All');
   const [search, setSearch] = useState('');
 
   // Load user + activities data on mount
   useEffect(() => {
     const load = async () => {
-      // get logged‑in user
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.id) {
         await initialize();
       }
-      // fetch activities from our protected API route
       const res = await fetch('/api/activities');
       const data = await res.json();
       setActivities(data);
-      // compute completed count once activities are loaded
       if (user?.id) {
         const count = data.filter((a: Activity) => isCompleted(a.id)).length;
         setCompletedCount(count);
       }
+      setLoading(false);
       setMounted(true);
     };
     load();
@@ -61,6 +61,30 @@ export default function ActivitiesPage() {
   });
 
   const pct = activities.length ? Math.round((completedCount / activities.length) * 100) : 0;
+
+  // Loading screen
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#f0f2f5]">
+        <Header />
+        <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
+          <div className="text-center">
+            <div className="relative mx-auto w-16 h-16 mb-6">
+              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45]/10" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45] border-t-transparent animate-spin" />
+              <div className="absolute inset-2 rounded-full border-4 border-amber-400/20" />
+              <div className="absolute inset-2 rounded-full border-4 border-amber-400 border-b-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+            </div>
+            <h2 className="text-lg font-bold text-[#1a2d45]">Loading Activities</h2>
+            <p className="mt-2 text-xs text-gray-400">Fetching projects from database...</p>
+            <div className="mt-4 mx-auto w-48 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div className="h-full rounded-full bg-[#1a2d45] animate-pulse" style={{ width: '60%' }} />
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f0f2f5]">
@@ -99,7 +123,7 @@ export default function ActivitiesPage() {
               </div>
             </div>
 
-            {/* Overall progress — only after mount */}
+            {/* Overall progress */}
             {mounted && completedCount > 0 && (
               <div className="mt-6 rounded-2xl bg-white/10 px-5 py-4">
                 <div className="mb-2 flex items-center justify-between">
@@ -111,6 +135,22 @@ export default function ActivitiesPage() {
                 <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full bg-emerald-400 transition-all duration-700" style={{ width: `${pct}%` }} />
                 </div>
+              </div>
+            )}
+
+            {/* Unlock banner */}
+            {!hasEsp32 && (
+              <div className="mt-6 rounded-2xl bg-amber-400/10 border border-amber-400/20 px-5 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-amber-300">🔒 Limited Preview</p>
+                  <p className="text-[10px] text-amber-200/60 mt-0.5">Only the first activity is available. Unlock all with your kit code.</p>
+                </div>
+                <Link
+                  href="/redeem"
+                  className="flex-shrink-0 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 px-4 py-2 text-[10px] font-bold text-white shadow-sm hover:scale-[1.02] transition-all"
+                >
+                  Unlock Full Access →
+                </Link>
               </div>
             )}
           </div>
@@ -178,7 +218,12 @@ export default function ActivitiesPage() {
             const done = mounted && isCompleted(activity.id);
             const progress = mounted ? getProgress(activity.id, activity.steps?.length ?? 5) : 0;
             const diff = DIFF[activity.difficulty] ?? DIFF.Beginner;
-            const isLocked = mounted && !hasEsp32 && activity.id !== 'dht_sensor';
+
+            // Sequential unlock: first activity free, rest need previous done + kit access
+            const originalIdx = activities.findIndex((a) => a.id === activity.id);
+            const isFirstActivity = originalIdx === 0;
+            const prevDone = originalIdx > 0 ? isCompleted(activities[originalIdx - 1].id) : true;
+            const isLocked = mounted && !isFirstActivity && (!hasEsp32 || !prevDone);
 
             return (
               <button
@@ -186,8 +231,9 @@ export default function ActivitiesPage() {
                 type="button"
                 onClick={() => {
                   if (isLocked) {
-                    alert('This activity requires kit activation code! Redirecting to activation page...');
-                    router.push('/redeem');
+                    if (!hasEsp32) {
+                      router.push('/redeem');
+                    }
                     return;
                   }
                   router.push(`/activities/${activity.id}`);
@@ -261,9 +307,15 @@ export default function ActivitiesPage() {
                     <span>🔧 {activity.equipment.length} parts</span>
                   </div>
                   {isLocked ? (
-                    <span className="text-[10px] font-bold text-gray-400">
-                      Kit Required
-                    </span>
+                    !hasEsp32 ? (
+                      <span className="rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 px-2.5 py-1 text-[10px] font-bold text-white">
+                        Unlock →
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-400">
+                        Complete previous
+                      </span>
+                    )
                   ) : (
                     <span className="rounded-lg bg-[#1a2d45] px-2.5 py-1 text-[10px] font-bold text-white opacity-0 transition-all duration-200 group-hover:opacity-100">
                       {done ? 'Review →' : 'Start →'}

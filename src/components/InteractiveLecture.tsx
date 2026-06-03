@@ -998,14 +998,21 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
       
       if (currentUser) {
         // Fetch saved progress
-        supabase.from('user_progress').select('read_sections').match({
+        supabase.from('user_progress').select('read_sections, quiz_score').match({
           user_id: currentUser.id,
           level_id: levelId.toString(),
           lesson_id: lessonId,
           step_id: stepId
         }).single().then(({ data, error }) => {
-          if (data && data.read_sections) {
-            setProgress(new Set(data.read_sections));
+          if (data) {
+            if (data.read_sections) {
+              setProgress(new Set(data.read_sections));
+            } else {
+              setProgress(new Set());
+            }
+            if (data.quiz_score !== null && data.quiz_score !== undefined) {
+              window.dispatchEvent(new CustomEvent('quiz-complete'));
+            }
           } else {
             setProgress(new Set());
           }
@@ -1015,6 +1022,13 @@ export default function InteractiveLecture({ levelId, lessonId, stepId }: Intera
       }
     });
   }, [key]);
+
+  // Dispatch custom event when lecture is fully read/completed
+  useEffect(() => {
+    if (lecture && lecture.sections.length > 0 && progress.size === lecture.sections.length) {
+      window.dispatchEvent(new CustomEvent('lecture-complete'));
+    }
+  }, [progress.size, lecture]);
 
   if (!lecture) {
     return (
@@ -1217,13 +1231,20 @@ if (user) {
           <QuizCard 
             quiz={lecture.quiz} 
             onQuizComplete={(score) => {
+              window.dispatchEvent(new CustomEvent('quiz-complete'));
               if (user) {
-                supabase.from('user_progress').update({ quiz_score: score }).match({
-                  user_id: user.id,
-                  level_id: levelId.toString(),
-                  lesson_id: lessonId,
-                  step_id: stepId
-                }).then(({ error }) => {
+                supabase.from('user_progress').upsert(
+                  {
+                    user_id: user.id,
+                    level_id: levelId.toString(),
+                    lesson_id: lessonId,
+                    step_id: stepId,
+                    quiz_score: score
+                  },
+                  {
+                    onConflict: 'user_id,course_id,level_id,lesson_id,step_id'
+                  }
+                ).then(({ error }) => {
                   if (error) console.error('Failed to save quiz score:', error);
                 });
               }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { generateCode } from '@/lib/codeGenerator';
 import { useAppStore } from '@/store/useAppStore';
@@ -14,6 +15,7 @@ interface CodePanelProps {
 }
 
 export default function CodePanel({ showLiveOutput = true }: CodePanelProps) {
+  const router = useRouter();
   const blocks: Block[] = useAppStore((state) => state.blocks);
   const hasAccess = useActivityStore((state) => state.hasAccess);
   const hasEsp32 = hasAccess('esp32');
@@ -75,7 +77,7 @@ export default function CodePanel({ showLiveOutput = true }: CodePanelProps) {
           type="button"
           onClick={() => {
             if (!hasEsp32) {
-              alert('Simulator is locked. Please activate your hardware kit code to access the real-time simulator!');
+              router.push('/redeem');
               return;
             }
             setActiveTab('simulator');

@@ -10,7 +10,7 @@ export async function signIn(formData: FormData) {
   if (error) {
     return redirect('/login?message=Could not authenticate user');
   }
-  return redirect('/learn/level/1/lesson/1-1');
+  return redirect('/dashboard');
 }
 
 export async function signUp(formData: FormData) {

@@ -17,6 +17,8 @@ import { SIMULATION_REGISTRY } from '@/lib/simulationRegistry';
 import { useAppStore } from '@/store/useAppStore';
 import InteractiveLecture from '@/components/InteractiveLecture';
 import { useActivityStore } from '@/store/useActivityStore';
+import Link from 'next/link';
+import { LECTURES_STRUCTURED_DATA } from '@/lib/lecturesStructuredData';
 
 export default function LessonPage() {
   const router = useRouter();
@@ -53,9 +55,18 @@ export default function LessonPage() {
   const [completedSteps, setCompletedSteps] = React.useState<Set<number>>(new Set());
   const [challengeError, setChallengeError] = React.useState<string | null>(null);
   const [challengePassed, setChallengePassed] = React.useState(false);
+  const [contentReady, setContentReady] = React.useState(false);
+  const [contentWarning, setContentWarning] = React.useState(false);
+  const [quizReady, setQuizReady] = React.useState(false);
+  const { markLessonComplete } = useActivityStore();
 
   const totalSteps = lesson?.steps.length ?? 0;
   const currentStep = lesson?.steps[currentStepIndex];
+
+  // Look up lecture metadata to check if there is a quiz
+  const lectureKey = `${levelId}-${lessonId}-${currentStep?.id}`;
+  const stepLecture = LECTURES_STRUCTURED_DATA[lectureKey];
+  const hasQuiz = !!(stepLecture?.quiz && stepLecture.quiz.length > 0);
 
   React.useEffect(() => {
     // Don't clear blocks on mapping step — student needs to see what they built
@@ -64,7 +75,22 @@ export default function LessonPage() {
     }
     setChallengeError(null);
     setChallengePassed(false);
+    setContentReady(false);
+    setContentWarning(false);
+    setQuizReady(false);
   }, [clearBlocks, currentStepIndex, currentStep?.type]);
+
+  // Listen for custom events from InteractiveLecture
+  React.useEffect(() => {
+    const handleLecture = () => setContentReady(true);
+    const handleQuiz = () => setQuizReady(true);
+    window.addEventListener('lecture-complete', handleLecture);
+    window.addEventListener('quiz-complete', handleQuiz);
+    return () => {
+      window.removeEventListener('lecture-complete', handleLecture);
+      window.removeEventListener('quiz-complete', handleQuiz);
+    };
+  }, []);
 
   if (isCheckingSub && !isFreePreview) {
     return (
@@ -198,7 +224,7 @@ export default function LessonPage() {
     return true;
   };
 
-  const handleAdvance = () => {
+  const handleAdvance = async () => {
     setCompletedSteps((prev) => {
       const next = new Set(prev);
       next.add(currentStepIndex);
@@ -206,7 +232,9 @@ export default function LessonPage() {
     });
 
     if (currentStepIndex >= totalSteps - 1) {
-      router.push('/learn');
+      // Mark lesson as complete in the store
+      await markLessonComplete(lessonId);
+      router.push(`/learn/level/${levelId}`);
       return;
     }
 
@@ -214,6 +242,20 @@ export default function LessonPage() {
   };
 
   const handleNext = () => {
+    // Gate content/concept steps: all sections must be marked as read
+    if (currentStep.type === 'content' || currentStep.type === 'concept') {
+      if (!currentStep.pdfUrl && !contentReady) {
+        setContentWarning(true);
+        return;
+      }
+      // Quiz requirement for concept building steps
+      if (currentStep.type === 'concept' && hasQuiz && !quizReady) {
+        setContentWarning(true);
+        return;
+      }
+    }
+    setContentWarning(false);
+
     if (currentStep.type === 'challenge') {
       if (currentStep.challengeSimulationId) {
         handleAdvance();
@@ -222,10 +264,8 @@ export default function LessonPage() {
       if (!challengePassed) {
         const isValid = validateChallenge();
         if (!isValid) return;
-        // Validation just passed — overlay will open, stay on this step
         return;
       }
-      // challengePassed already true — advance
       handleAdvance();
       return;
     }
@@ -311,9 +351,19 @@ export default function LessonPage() {
             </div>
           )}
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {contentWarning && (currentStep.type === 'content' || currentStep.type === 'concept') && (
+              <div className="mx-8 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-xs text-amber-800 flex items-center gap-2 animate-fadeIn flex-shrink-0">
+                <span>⚠️</span>
+                <span className="font-bold">
+                  {currentStep.type === 'concept' && hasQuiz && !quizReady
+                    ? 'Please complete the lecture reading and attempt the quiz before continuing!'
+                    : 'Please read and mark all sections as complete before continuing!'}
+                </span>
+              </div>
+            )}
             {(currentStep.type === 'content' || currentStep.type === 'concept') && (
-              <div className="h-full px-8 py-6 overflow-y-auto">
+              <div className="flex-1 px-8 py-6 overflow-y-auto min-h-0">
                 {currentStep.pdfUrl ? (
                   <PDFViewer url={currentStep.pdfUrl} title={currentStep.pdfLabel} />
                 ) : (
@@ -332,6 +382,11 @@ export default function LessonPage() {
                   {currentStep.hint && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
                       💡 Hint: {currentStep.hint}
+                    </div>
+                  )}
+                  {contentWarning && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+                      📖 Please read and mark all sections as complete before proceeding.
                     </div>
                   )}
                   {currentStep.type === 'challenge' && challengeError && (
