@@ -16,6 +16,7 @@ type ActivityStore = {
   overallProgress: number;                // overall progress percentage
   totalActivities: number;                 // total count of activities
   userId: string;
+  courseId: string;
 
   // Kit subscription tracking
   redeemedKits: string[];                   // list of redeemed courses (e.g. ['esp32'])
@@ -48,6 +49,7 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
   userId: '' as string,
   redeemedKits: [],
   isCheckingSub: true,
+  courseId : ''as string,
 
   hasAccess: (courseId: string) => {
     return get().redeemedKits.includes(courseId);
@@ -117,24 +119,53 @@ export const useActivityStore = create<ActivityStore>()((set, get) => ({
     }
   },
 
-  markStepComplete: async (activityId, step) => {
-    const current = get().stepProgress[activityId] ?? 0;
-    if (step <= current) return;
+markStepComplete: async (activityId, step) => {
+  const supabase = createClient();
 
-    const newStepProgress = { ...get().stepProgress, [activityId]: step };
-    set({ stepProgress: newStepProgress });
+  const current = get().stepProgress[activityId] ?? 0;
+
+  console.log('[markStepComplete] called:', { activityId, step, current });
+
+  if (step <= current) {
+    console.log('[markStepComplete] skipped (step not greater than current)');
+    return;
+  }
+
+  const newStepProgress = { ...get().stepProgress, [activityId]: step };
+
+  console.log('[markStepComplete] newStepProgress:', newStepProgress);
+
+  set({ stepProgress: newStepProgress });
+
+  const payload = {
+    user_id: get().userId,
+    completed: get().completed,
+    step_progress: newStepProgress,
+    streak: get().streak,
+    last_active: get().lastActive,
+    user_progress: get().overallProgress,
+    course_id: get().courseId
     
-    // Sync with DB (include all fields so other fields are not overwritten)
-    await createClient().from('user_activities').upsert({
-      user_id: get().userId,
-      completed: get().completed,
-      step_progress: newStepProgress,
-      streak: get().streak,
-      last_active: get().lastActive,
-      user_progress: get().overallProgress,
-    });
-    await get()._updateOverallProgress();
-  },
+  };
+
+  console.log('[markStepComplete] upsert payload:', payload);
+
+  const { data, error } = await supabase
+    .from('user_activities')
+    .upsert(payload, {
+  onConflict: 'user_id,course_id,level_id,lesson_id,step_id'
+})
+    .select();
+
+  console.log('[markStepComplete] supabase response:', { data, error });
+
+  if (error) {
+    console.error('[markStepComplete] Supabase error:', error);
+    return;
+  }
+
+  await get()._updateOverallProgress();
+},
 
   markActivityComplete: async (activityId) => {
     const newCompleted = get().completed.includes(activityId)

@@ -1077,7 +1077,7 @@ if (user) {
         completed_at: new Date().toISOString(),
       },
       {
-        onConflict: 'user_id,level_id,lesson_id,step_id'
+        onConflict: 'user_id,course_id,level_id,lesson_id,step_id'
       }
     )
     .then(({ error }) => {
