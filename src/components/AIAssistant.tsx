@@ -4,6 +4,7 @@ import React from 'react';
 
 import { BLOCK_CATALOGUE } from '@/lib/blockCatalogue';
 import { useAppStore } from '@/store/useAppStore';
+import { useActivityStore } from '@/store/useActivityStore';
 import type { Block } from '@/types';
 
 type Message = {
@@ -16,6 +17,8 @@ type Message = {
 export default function AIAssistant() {
   const addBlock = useAppStore((state) => state.addBlock);
   const clearBlocks = useAppStore((state) => state.clearBlocks);
+  const hasAccess = useActivityStore((state) => state.hasAccess);
+  const hasEsp32 = hasAccess('esp32');
 
   const [isOpen, setIsOpen] = React.useState(false);
   const [messages, setMessages] = React.useState<Message[]>([
@@ -196,37 +199,50 @@ export default function AIAssistant() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="px-3 py-1.5 border-t border-gray-100 bg-white flex items-center gap-2">
-            <input
-              id="replace-blocks-chat"
-              type="checkbox"
-              checked={replaceBlocks}
-              onChange={(event) => setReplaceBlocks(event.target.checked)}
-            />
-            <label htmlFor="replace-blocks-chat" className="text-xs text-gray-400">
-              Replace blocks
-            </label>
-          </div>
+          {hasEsp32 ? (
+            <>
+              <div className="px-3 py-1.5 border-t border-gray-100 bg-white flex items-center gap-2">
+                <input
+                  id="replace-blocks-chat"
+                  type="checkbox"
+                  checked={replaceBlocks}
+                  onChange={(event) => setReplaceBlocks(event.target.checked)}
+                />
+                <label htmlFor="replace-blocks-chat" className="text-xs text-gray-400">
+                  Replace blocks
+                </label>
+              </div>
 
-          <div className="px-3 py-2 bg-white border-t border-gray-100 flex gap-2 items-end">
-            <textarea
-              rows={1}
-              value={inputText}
-              onChange={(event) => setInputText(event.target.value)}
-              onKeyDown={handleInputKeyDown}
-              placeholder="Ask me to build something..."
-              className="flex-1 resize-none text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#2E4862]"
-            />
-            <button
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={isLoading || !inputText.trim()}
-              className="h-8 w-8 rounded-full bg-[#2E4862] text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Send message"
-            >
-              ➤
-            </button>
-          </div>
+              <div className="px-3 py-2 bg-white border-t border-gray-100 flex gap-2 items-end">
+                <textarea
+                  rows={1}
+                  value={inputText}
+                  onChange={(event) => setInputText(event.target.value)}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder="Ask me to build something..."
+                  className="flex-1 resize-none text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#2E4862]"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleSend()}
+                  disabled={isLoading || !inputText.trim()}
+                  className="h-8 w-8 rounded-full bg-[#2E4862] text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Send message"
+                >
+                  ➤
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="px-4 py-4 bg-slate-50 border-t border-gray-100 text-center flex flex-col gap-1.5 flex-shrink-0">
+              <p className="text-xs text-[#2E4862] font-bold flex items-center justify-center gap-1.5">
+                <span>🔒 Gemini Assistant Locked</span>
+              </p>
+              <p className="text-[10px] text-gray-400 leading-relaxed px-2">
+                Activate your physical hardware kit activation code to chat with the AI assistant.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </>

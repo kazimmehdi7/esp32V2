@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 import { generateCode } from '@/lib/codeGenerator';
 import { useAppStore } from '@/store/useAppStore';
+import { useActivityStore } from '@/store/useActivityStore';
 import type { Block } from '@/types';
 import LiveOutput from '@/components/LiveOutput';
 import LiveSimulator from '@/components/LiveSimulator';
@@ -14,6 +15,8 @@ interface CodePanelProps {
 
 export default function CodePanel({ showLiveOutput = true }: CodePanelProps) {
   const blocks: Block[] = useAppStore((state) => state.blocks);
+  const hasAccess = useActivityStore((state) => state.hasAccess);
+  const hasEsp32 = hasAccess('esp32');
   const [copied, setCopied] = React.useState(false);
   const [activeTab, setActiveTab] = useState<'code' | 'simulator'>('code');
 
@@ -70,14 +73,21 @@ export default function CodePanel({ showLiveOutput = true }: CodePanelProps) {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('simulator')}
-          className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${
+          onClick={() => {
+            if (!hasEsp32) {
+              alert('Simulator is locked. Please activate your hardware kit code to access the real-time simulator!');
+              return;
+            }
+            setActiveTab('simulator');
+          }}
+          className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors flex items-center gap-1.5 ${
             activeTab === 'simulator'
               ? 'bg-[#2E4862] text-white'
               : 'bg-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          🎮 Simulator
+          <span>🎮 Simulator</span>
+          {!hasEsp32 && <span className="text-xs" title="Requires kit activation">🔒</span>}
         </button>
       </div>
 

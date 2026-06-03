@@ -19,7 +19,8 @@ type Filter = typeof FILTERS[number];
 
 export default function ActivitiesPage() {
   const router = useRouter();
-  const { isCompleted, getProgress, initialize } = useActivityStore();
+  const { isCompleted, getProgress, initialize, hasAccess } = useActivityStore();
+  const hasEsp32 = hasAccess('esp32');
 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
@@ -34,7 +35,7 @@ export default function ActivitiesPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.id) {
-        await initialize(user.id);
+        await initialize();
       }
       // fetch activities from our protected API route
       const res = await fetch('/api/activities');
@@ -177,13 +178,26 @@ export default function ActivitiesPage() {
             const done = mounted && isCompleted(activity.id);
             const progress = mounted ? getProgress(activity.id, activity.steps?.length ?? 5) : 0;
             const diff = DIFF[activity.difficulty] ?? DIFF.Beginner;
+            const isLocked = mounted && !hasEsp32 && activity.id !== 'dht_sensor';
+
             return (
               <button
                 key={activity.id}
                 type="button"
-                onClick={() => router.push(`/activities/${activity.id}`)}
-                className={`group relative flex flex-col rounded-2xl bg-white p-5 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                  done ? 'ring-2 ring-emerald-200' : 'hover:ring-1 hover:ring-[#1a2d45]/10'
+                onClick={() => {
+                  if (isLocked) {
+                    alert('This activity requires kit activation code! Redirecting to activation page...');
+                    router.push('/redeem');
+                    return;
+                  }
+                  router.push(`/activities/${activity.id}`);
+                }}
+                className={`group relative flex flex-col rounded-2xl bg-white p-5 text-left shadow-sm transition-all duration-200 ${
+                  isLocked
+                    ? 'opacity-65 cursor-not-allowed border border-dashed border-gray-300 shadow-none'
+                    : `hover:-translate-y-1 hover:shadow-lg ${
+                        done ? 'ring-2 ring-emerald-200' : 'hover:ring-1 hover:ring-[#1a2d45]/10'
+                      }`
                 }`}
               >
                 {/* Top row */}
@@ -192,11 +206,15 @@ export default function ActivitiesPage() {
                     {activity.icon}
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
-                    {done && (
+                    {isLocked ? (
+                      <span className="rounded-full bg-gray-400 px-2.5 py-0.5 text-[10px] font-extrabold text-white flex items-center gap-1">
+                        🔒 Locked
+                      </span>
+                    ) : done ? (
                       <span className="rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-extrabold text-white">
                         Done
                       </span>
-                    )}
+                    ) : null}
                     <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${diff.bg} ${diff.color}`}> 
                       <span className={`h-1.5 w-1.5 rounded-full ${diff.dot}`} />
                       {diff.label}
@@ -215,7 +233,7 @@ export default function ActivitiesPage() {
                 </p>
 
                 {/* Progress bar */}
-                {!done && progress > 0 && (
+                {!isLocked && !done && progress > 0 && (
                   <div className="mt-3 rounded-xl bg-[#f8f9fb] px-3 py-2.5">
                     <div className="mb-1.5 flex justify-between">
                       <span className="text-[10px] font-semibold text-gray-400">In progress</span>
@@ -242,9 +260,15 @@ export default function ActivitiesPage() {
                     <span>⏱ {activity.duration}</span>
                     <span>🔧 {activity.equipment.length} parts</span>
                   </div>
-                  <span className="rounded-lg bg-[#1a2d45] px-2.5 py-1 text-[10px] font-bold text-white opacity-0 transition-all duration-200 group-hover:opacity-100">
-                    {done ? 'Review →' : 'Start →'}
-                  </span>
+                  {isLocked ? (
+                    <span className="text-[10px] font-bold text-gray-400">
+                      Kit Required
+                    </span>
+                  ) : (
+                    <span className="rounded-lg bg-[#1a2d45] px-2.5 py-1 text-[10px] font-bold text-white opacity-0 transition-all duration-200 group-hover:opacity-100">
+                      {done ? 'Review →' : 'Start →'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Teaches */}

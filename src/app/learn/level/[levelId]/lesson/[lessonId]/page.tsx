@@ -16,6 +16,7 @@ import { LEVELS } from '@/lib/lessonConfig';
 import { SIMULATION_REGISTRY } from '@/lib/simulationRegistry';
 import { useAppStore } from '@/store/useAppStore';
 import InteractiveLecture from '@/components/InteractiveLecture';
+import { useActivityStore } from '@/store/useActivityStore';
 
 export default function LessonPage() {
   const router = useRouter();
@@ -25,6 +26,25 @@ export default function LessonPage() {
 
   const levelId = Number(params.levelId);
   const lessonId = params.lessonId;
+
+  // Kit code activation check
+  const { hasAccess, isCheckingSub, initialize } = useActivityStore();
+  const hasEsp32 = hasAccess('esp32');
+  const isFreePreview = levelId === 1 && lessonId === '1-1';
+
+  React.useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  React.useEffect(() => {
+    if (!isCheckingSub && !isFreePreview) {
+      const isLessonLocked = !hasEsp32 && (levelId > 1 || lessonId !== '1-1');
+      if (isLessonLocked) {
+        alert('This lesson requires kit activation code! Redirecting to activation page...');
+        router.push('/redeem');
+      }
+    }
+  }, [isCheckingSub, hasEsp32, levelId, lessonId, isFreePreview, router]);
 
   const level = LEVELS.find((l) => l.id === levelId);
   const lesson = level?.lessons.find((l) => l.id === lessonId);
@@ -45,6 +65,17 @@ export default function LessonPage() {
     setChallengeError(null);
     setChallengePassed(false);
   }, [clearBlocks, currentStepIndex, currentStep?.type]);
+
+  if (isCheckingSub && !isFreePreview) {
+    return (
+      <main className="min-h-screen bg-[#EDEDED] flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2E4862] border-t-transparent mx-auto"></div>
+          <p className="mt-3 text-sm text-gray-500 font-medium">Verifying kit activation...</p>
+        </div>
+      </main>
+    );
+  }
 
   if (!level || !lesson) {
     return (
