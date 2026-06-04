@@ -47,7 +47,7 @@ export default function Header() {
       {/* Center: Nav links */}
       <div className="flex items-center gap-1">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/playground')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             pathname === '/'
               ? 'bg-white/20 text-white'
