@@ -1,5 +1,6 @@
 // src/lib/activitiesData.ts
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type Equipment = {

@@ -2,11 +2,14 @@ import type { BlockParam } from "@/types";
 
 type BlockTemplate = {
   type: string;
-  icon: string;
+  icon: string;       // short text key (no emojis) — rendered as SVG by UI components
   label: string;
   params: BlockParam[];
 };
 
+/* ════════════════════════════════════════════════════════════════════════
+   BLOCK COLOURS — Tailwind bg classes per block type
+   ════════════════════════════════════════════════════════════════════════ */
 export const BLOCK_COLOURS: Record<string, string> = {
   pinMode: 'bg-orange-500',
   dw_high: 'bg-orange-500',
@@ -65,37 +68,36 @@ export const BLOCK_COLOURS: Record<string, string> = {
   oled_display: 'bg-green-500',
 };
 
+/* ════════════════════════════════════════════════════════════════════════
+   BLOCK CATALOGUE — no emojis, icon field is a short text key
+   UI components render these as SVGs using the BLOCK_ICON_KEY map below.
+   ════════════════════════════════════════════════════════════════════════ */
 export const BLOCK_CATALOGUE: BlockTemplate[] = [
-  // Output blocks
+  // ── Output ──
   {
     type: "pinMode",
-    icon: "📌",
+    icon: "PIN",
     label: "Set Pin <pin> as <mode>",
     params: [
       { name: "pin", type: "number", default: 2 },
-      {
-        name: "mode",
-        type: "select",
-        default: "OUTPUT",
-        options: ["OUTPUT", "INPUT", "INPUT_PULLUP"],
-      },
+      { name: "mode", type: "select", default: "OUTPUT", options: ["OUTPUT", "INPUT", "INPUT_PULLUP"] },
     ],
   },
   {
     type: "dw_high",
-    icon: "💡",
+    icon: "LED",
     label: "Turn ON LED on Pin <pin>",
     params: [{ name: "pin", type: "number", default: 2 }],
   },
   {
     type: "dw_low",
-    icon: "🌑",
+    icon: "OFF",
     label: "Turn OFF LED on Pin <pin>",
     params: [{ name: "pin", type: "number", default: 2 }],
   },
   {
     type: "blink",
-    icon: "✨",
+    icon: "BLK",
     label: "Blink LED on Pin <pin> every <ms>ms",
     params: [
       { name: "pin", type: "number", default: 2 },
@@ -104,7 +106,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "tone_on",
-    icon: "🔊",
+    icon: "SND",
     label: "Play buzzer on Pin <pin> at <freq> Hz",
     params: [
       { name: "pin", type: "number", default: 13 },
@@ -113,21 +115,21 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "tone_off",
-    icon: "🔕",
+    icon: "MUT",
     label: "Stop buzzer on Pin <pin>",
     params: [{ name: "pin", type: "number", default: 13 }],
   },
 
-  // PWM blocks
+  // ── PWM ──
   {
     type: "pwm_setup",
-    icon: "🔆",
+    icon: "PWM",
     label: "Setup PWM Pin <pin>",
     params: [{ name: "pin", type: "number", default: 2 }],
   },
   {
     type: "pwm_write",
-    icon: "🌗",
+    icon: "DIM",
     label: "Set brightness on Pin <pin> to <val>",
     params: [
       { name: "pin", type: "number", default: 2 },
@@ -136,7 +138,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "servo_write",
-    icon: "⚙️",
+    icon: "SRV",
     label: "Set Servo on Pin <pin> to <deg> degrees",
     params: [
       { name: "pin", type: "number", default: 2 },
@@ -144,28 +146,28 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
     ],
   },
 
-  // Sensor blocks
+  // ── Sensors ──
   {
     type: "dht_setup",
-    icon: "🌡️",
+    icon: "TMP",
     label: "Setup DHT11 sensor on Pin <pin>",
     params: [{ name: "pin", type: "number", default: 4 }],
   },
   {
     type: "dht_temp",
-    icon: "🌡️",
+    icon: "TMP",
     label: "Read temperature into <var>",
     params: [{ name: "var", type: "text", default: "temp" }],
   },
   {
     type: "dht_hum",
-    icon: "💧",
+    icon: "HUM",
     label: "Read humidity into <var>",
     params: [{ name: "var", type: "text", default: "humidity" }],
   },
   {
     type: "btn_read",
-    icon: "🔘",
+    icon: "BTN",
     label: "Read button on Pin <pin> into <var>",
     params: [
       { name: "pin", type: "number", default: 12 },
@@ -174,7 +176,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "pir_read",
-    icon: "👁️",
+    icon: "PIR",
     label: "Read PIR motion on Pin <pin> into <var>",
     params: [
       { name: "pin", type: "number", default: 14 },
@@ -183,7 +185,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "analog_read",
-    icon: "📊",
+    icon: "ADC",
     label: "Read analog Pin <pin> into <var>",
     params: [
       { name: "pin", type: "number", default: 34 },
@@ -192,7 +194,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "map_val",
-    icon: "🗺️",
+    icon: "MAP",
     label: "Map <var> from <fromLow>-<fromHigh> to <toLow>-<toHigh>",
     params: [
       { name: "var", type: "text", default: "sensorVal" },
@@ -204,7 +206,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "ultrasonic",
-    icon: "📏",
+    icon: "USS",
     label: "Read ultrasonic Trig <trig> Echo <echo> into <var>",
     params: [
       { name: "trig", type: "number", default: 12 },
@@ -213,69 +215,64 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
     ],
   },
 
-  // Control blocks
+  // ── Control ──
   {
     type: "delay_ms",
-    icon: "⏳",
+    icon: "DLY",
     label: "Wait <ms> milliseconds",
     params: [{ name: "ms", type: "number", default: 1000 }],
   },
   {
     type: "delay_sec",
-    icon: "🕐",
+    icon: "SEC",
     label: "Wait <sec> seconds",
     params: [{ name: "sec", type: "number", default: 1 }],
   },
   {
     type: "for_loop",
-    icon: "🔁",
-    label: "Repeat <times> times ▼",
+    icon: "RPT",
+    label: "Repeat <times> times",
     params: [{ name: "times", type: "number", default: 5 }],
   },
   {
     type: "while_loop",
-    icon: "🔄",
-    label: "While <var> <op> <val> is true ▼",
+    icon: "WHL",
+    label: "While <var> <op> <val> is true",
     params: [
       { name: "var", type: "text", default: "counter" },
-      {
-        name: "op",
-        type: "select",
-        default: ">",
-        options: ["==", "!=", ">", "<", ">=", "<="],
-      },
+      { name: "op", type: "select", default: ">", options: ["==", "!=", ">", "<", ">=", "<="] },
       { name: "val", type: "text", default: "0" },
     ],
   },
   {
     type: "end_loop",
-    icon: "🔚",
-    label: "End loop ▲",
+    icon: "END",
+    label: "End loop",
     params: [],
   },
   {
     type: "if_block",
-    icon: "❓",
-    label: "If <cond> then ▼",
+    icon: "IF",
+    label: "If <cond> then",
     params: [{ name: "cond", type: "text", default: "temp > 30" }],
   },
   {
     type: "else_block",
-    icon: "↩️",
-    label: "Otherwise ▼",
+    icon: "ELS",
+    label: "Otherwise",
     params: [],
   },
   {
     type: "end_if",
-    icon: "🔚",
-    label: "End If ▲",
+    icon: "END",
+    label: "End If",
     params: [],
   },
 
-  // WiFi blocks
+  // ── WiFi ──
   {
     type: "wifi_connect",
-    icon: "📶",
+    icon: "WFI",
     label: 'Connect to WiFi "<ssid>" password "<pass>"',
     params: [
       { name: "ssid", type: "text", default: "MyWiFi" },
@@ -284,27 +281,27 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "wifi_wait",
-    icon: "⌛",
+    icon: "WAT",
     label: "Wait until WiFi is connected",
     params: [],
   },
   {
     type: "wifi_ip",
-    icon: "🌐",
+    icon: "IP",
     label: "Print my IP address to Serial",
     params: [],
   },
 
-  // MQTT blocks
+  // ── MQTT ──
   {
     type: "mqtt_setup",
-    icon: "☁️",
+    icon: "MQT",
     label: 'Connect to MQTT broker "<broker>"',
     params: [{ name: "broker", type: "text", default: "broker.hivemq.com" }],
   },
   {
     type: "mqtt_publish",
-    icon: "📤",
+    icon: "PUB",
     label: 'Publish <val> to topic "<topic>"',
     params: [
       { name: "val", type: "text", default: "temp" },
@@ -313,39 +310,39 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "mqtt_subscribe",
-    icon: "📥",
+    icon: "SUB",
     label: 'Subscribe to topic "<topic>"',
     params: [{ name: "topic", type: "text", default: "home/led" }],
   },
   {
     type: "mqtt_loop",
-    icon: "🔃",
+    icon: "MQL",
     label: "Keep MQTT alive (put in loop)",
     params: [],
   },
 
-  // Serial blocks
+  // ── Serial ──
   {
     type: "serial_begin",
-    icon: "🔌",
+    icon: "SER",
     label: "Start Serial Monitor",
     params: [],
   },
   {
     type: "serial_print",
-    icon: "💬",
+    icon: "PRT",
     label: 'Print "<msg>" to monitor',
     params: [{ name: "msg", type: "text", default: "Hello ESP32!" }],
   },
   {
     type: "serial_printvar",
-    icon: "📊",
+    icon: "VAR",
     label: "Print variable <var> to monitor",
     params: [{ name: "var", type: "text", default: "temp" }],
   },
   {
     type: "serial_println",
-    icon: "📃",
+    icon: "LN",
     label: 'Print "<label>" + <var> on new line',
     params: [
       { name: "label", type: "text", default: "Temp: " },
@@ -353,10 +350,10 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
     ],
   },
 
-  // Variable blocks
+  // ── Variables ──
   {
     type: "var_int",
-    icon: "🔢",
+    icon: "INT",
     label: 'Create number "<name>" = <val>',
     params: [
       { name: "name", type: "text", default: "myNum" },
@@ -365,7 +362,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "var_float",
-    icon: "🔣",
+    icon: "FLT",
     label: 'Create decimal "<name>" = <val>',
     params: [
       { name: "name", type: "text", default: "myFloat" },
@@ -374,7 +371,7 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "var_str",
-    icon: "📝",
+    icon: "STR",
     label: 'Create text "<name>" = "<val>"',
     params: [
       { name: "name", type: "text", default: "myText" },
@@ -383,21 +380,16 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "var_bool",
-    icon: "☑️",
+    icon: "BOL",
     label: 'Create true/false "<name>" = <val>',
     params: [
       { name: "name", type: "text", default: "isOn" },
-      {
-        name: "val",
-        type: "select",
-        default: "false",
-        options: ["true", "false"],
-      },
+      { name: "val", type: "select", default: "false", options: ["true", "false"] },
     ],
   },
   {
     type: "var_add",
-    icon: "🔢",
+    icon: "ADD",
     label: 'Change "<name>" by <step>',
     params: [
       { name: "name", type: "text", default: "myNum" },
@@ -405,22 +397,22 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
     ],
   },
 
-  // Display blocks
+  // ── Display ──
   {
     type: "oled_setup",
-    icon: "📺",
+    icon: "OLE",
     label: "Setup OLED Display 128x64",
     params: [],
   },
   {
     type: "oled_clear",
-    icon: "🧽",
+    icon: "CLR",
     label: "Clear OLED Buffer",
     params: [],
   },
   {
     type: "oled_set_cursor",
-    icon: "📍",
+    icon: "CUR",
     label: "Set OLED Cursor X: <x> Y: <y>",
     params: [
       { name: "x", type: "number", default: 0 },
@@ -429,19 +421,19 @@ export const BLOCK_CATALOGUE: BlockTemplate[] = [
   },
   {
     type: "oled_print",
-    icon: "📝",
+    icon: "TXT",
     label: 'Print "<text>" to OLED Buffer',
     params: [{ name: "text", type: "text", default: "Hello!" }],
   },
   {
     type: "oled_printvar",
-    icon: "📊",
+    icon: "VAR",
     label: "Print variable <var> to OLED Buffer",
     params: [{ name: "var", type: "text", default: "sensorVal" }],
   },
   {
     type: "oled_display",
-    icon: "🖥️",
+    icon: "DSP",
     label: "Update OLED Screen (Display)",
     params: [],
   },
