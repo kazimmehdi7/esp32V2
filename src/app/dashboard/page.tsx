@@ -41,6 +41,12 @@ const I = {
   lock: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>),
   wire: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="5" cy="6" r="2" /><circle cx="19" cy="18" r="2" /><path d="M7 6h6a4 4 0 0 1 4 4v6" /></svg>),
   cpu: (p: any) => (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="5" y="5" width="14" height="14" rx="2" /><rect x="9" y="9" width="6" height="6" rx="1" /><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></svg>),
+    trophy: (p: any) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M8 21h8M12 17v4M7 4h10a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M12 3v1" />
+    </svg>
+  ),
 };
 
 export default function DashboardPage() {
@@ -54,10 +60,15 @@ export default function DashboardPage() {
 
   const completedCount = mounted ? completed.length : 0;
   const clientStreak = mounted ? streak : 0;
-  const deviceId = mounted ? (activeDeviceId || 'Not linked') : 'Not linked';
-  const deviceLinked = mounted && !!activeDeviceId;
   const pct = totalActivities ? Math.round((completedCount / totalActivities) * 100) : 0;
   const nextActivity = mounted ? ACTIVITIES.find((a) => !isCompleted(a.id)) : ACTIVITIES[0];
+
+  // XP Logic (same as activities page)
+  const xp = completedCount * 250;
+  const xpMax = 1000;
+  const xpPct = Math.min(100, Math.round((xp / xpMax) * 100));
+  const lvl = completedCount === 0 ? 1 : completedCount <= 2 ? 2 : 3;
+  const lvlName = ['', 'Beginner', 'Explorer', 'Maker'][lvl];
 
   return (
     <main style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: '"Inter",system-ui,sans-serif' }}>
@@ -124,7 +135,7 @@ export default function DashboardPage() {
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 99, padding: '5px 13px', marginBottom: 16 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN, animation: 'bm-pulse 2s infinite' }} />
-                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: BLUE_LT, fontFamily: '"JetBrains Mono",monospace' }}>Your Workspace</span>
+                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: BLUE_LT, fontFamily: '"Inter", system-ui, sans-serif' }}>Your Workspace</span>
               </div>
               <h1 style={{ fontSize: 'clamp(27px,4vw,36px)', fontWeight: 700, lineHeight: 1.08, letterSpacing: -0.6, color: TEXT }}>Welcome back</h1>
               <p style={{ marginTop: 10, fontSize: 14.5, color: MUTED, maxWidth: 440, lineHeight: 1.6 }}>
@@ -170,8 +181,8 @@ export default function DashboardPage() {
             <StatCard Icon={I.target} label="Current Level" value="Level 1" accent={VIOLET} />
             <StatCard Icon={I.check} label="Projects Done" value={`${completedCount} / ${totalActivities}`} accent={GREEN} />
             <StatCard Icon={I.flame} label="Day Streak" value={`${clientStreak} ${clientStreak === 1 ? 'day' : 'days'}`} accent={AMBER} />
-            <StatCard Icon={I.chip} label="Device" value={deviceLinked ? 'Linked' : 'Not linked'} sub={deviceLinked ? deviceId : undefined} accent={deviceLinked ? GREEN : FAINT} live={deviceLinked} />
-          </div>
+            <StatCard Icon={I.trophy} label="Rewards XP" value={`${xp.toLocaleString()} XP`} accent={AMBER} sub={`${xpPct}% to next`} />   
+                   </div>
         </section>
 
         {/* ════════ FEATURES (left) + STATUS (right) — side by side ════════ */}
@@ -200,24 +211,28 @@ export default function DashboardPage() {
               <SectionTitle title="Status" sub="Your account and hardware at a glance." />
               <div className="bm-status-stack" style={{ marginTop: 16 }}>
 
-                {/* Device status */}
+                {/* XP Progress Card */}
                 <div className="bm-card" style={{ borderRadius: 18, background: CARD, border: `1px solid ${LINE}`, padding: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ width: 42, height: 42, borderRadius: 12, background: hexA(deviceLinked ? GREEN : FAINT, 0.12), color: deviceLinked ? GREEN_LT : FAINT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I.cpu width={21} height={21} /></span>
+                      <span style={{ width: 42, height: 42, borderRadius: 12, background: hexA(AMBER, 0.12), color: AMBER_LT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <I.trophy width={21} height={21} />
+                      </span>
                       <div>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: TEXT, fontFamily: '"Space Grotesk",sans-serif' }}>ESP32 Device</p>
-                        <p style={{ fontSize: 11.5, color: MUTED }}>For flashing your code</p>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: TEXT, fontFamily: '"Space Grotesk",sans-serif' }}>Level Progress</p>
+                        <p style={{ fontSize: 11.5, color: MUTED }}>{lvlName} • {xp.toLocaleString()} XP</p>
                       </div>
                     </div>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 99, background: hexA(deviceLinked ? GREEN : FAINT, 0.12), padding: '5px 11px', fontSize: 11, fontWeight: 700, color: deviceLinked ? GREEN_LT : FAINT }}>
-                      {deviceLinked && <span style={{ width: 6, height: 6, borderRadius: '50%', background: GREEN, animation: 'bm-pulse 1.4s infinite' }} />}
-                      {deviceLinked ? 'Connected' : 'Not linked'}
-                    </span>
+                    <span style={{ fontSize: 19, fontWeight: 700, color: AMBER_LT, fontFamily: '"Space Grotesk",sans-serif' }}>{xpPct}%</span>
                   </div>
-                  {deviceLinked && (
-                    <p style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE_SOFT}`, fontSize: 11, color: FAINT, fontFamily: '"JetBrains Mono",monospace' }}>ID · {deviceId}</p>
-                  )}
+
+                  <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
+                    <div style={{ height: '100%', width: `${xpPct}%`, background: `linear-gradient(90deg, ${AMBER}, ${AMBER_LT})`, transition: 'width 1s cubic-bezier(0.16,1,0.3,1)' }} />
+                  </div>
+
+                  <p style={{ fontSize: 11.5, color: FAINT, fontFamily: '"Inter", system-ui, sans-serif' }}>
+                    Level {lvl} • {completedCount} projects
+                  </p>
                 </div>
 
                 {/* Completion overview */}
@@ -334,7 +349,7 @@ function FeatureRow({ primary, Icon, title, desc, tone, tag, onClick }: {
       <div style={{ position: 'relative', minWidth: 0, flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: 17, fontWeight: 700, color: primary ? '#fff' : TEXT }}>{title}</h2>
-          {tag && <span style={{ borderRadius: 99, background: hexA(tone, 0.14), color: primary ? '#bfdbfe' : tone, padding: '3px 10px', fontSize: 10, fontWeight: 700, fontFamily: '"JetBrains Mono",monospace' }}>{tag}</span>}
+          {tag && <span style={{ borderRadius: 99, background: hexA(tone, 0.14), color: primary ? '#bfdbfe' : tone, padding: '3px 10px', fontSize: 10, fontWeight: 700, fontFamily: '"Inter", system-ui, sans-serif' }}>{tag}</span>}
         </div>
         <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6, color: primary ? 'rgba(255,255,255,0.66)' : MUTED }}>{desc}</p>
         <p style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: primary ? '#bfdbfe' : tone }}>
@@ -357,7 +372,7 @@ function StatCard({ Icon, label, value, accent, live, sub }: { Icon: (p: any) =>
         {live && <span style={{ width: 7, height: 7, borderRadius: '50%', background: GREEN, animation: 'bm-pulse 1.4s infinite', flexShrink: 0 }} />}
         <p style={{ fontSize: 17, fontWeight: 700, color: TEXT, fontFamily: '"Space Grotesk",sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
       </div>
-      {sub && <p style={{ marginTop: 3, fontSize: 9.5, color: FAINT, fontFamily: '"JetBrains Mono",monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>}
+      {sub && <p style={{ marginTop: 3, fontSize: 9.5, color: FAINT, fontFamily: '"Inter", system-ui, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</p>}
     </div>
   );
 }

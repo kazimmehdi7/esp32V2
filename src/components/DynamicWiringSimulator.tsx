@@ -235,33 +235,34 @@ const WHY_MAP: Record<string, string> = {
 function buildSteps(cfg: ComponentConfig): Step[] {
   const pins = CPINS[cfg.type] || CPINS.DHT22;
   const label = cfg.label || cfg.type;
+
   const steps: Step[] = [{
-    instr: `Wiring ${label} to ESP32 WROOM-32. ${cfg.pins.length} connections needed. Follow each step carefully.`,
-    why: `The ESP32 operates at 3.3V logic and has WiFi + BLE. Each pin serves a specific function — power, ground, or data.`,
+    instr: `Wiring ${label} to the ESP32 WROOM-32. ${cfg.pins.length} connection${cfg.pins.length === 1 ? '' : 's'} needed — follow each step in order.`,
+    why: 'The ESP32 runs on 3.3V logic with built-in WiFi and BLE. Every pin has a role: power, ground, or data.',
     wire: null, logText: null, logColor: '#48bb78',
   }];
 
   cfg.pins.forEach((pin, i) => {
-    const cp = pins.find(p => p.name.toUpperCase() === pin.name.toUpperCase()) || pins[i] || pins[0];
+    const cp = pins.find(p => p.name.toUpperCase() === pin.name.toUpperCase()) ?? pins[i] ?? pins[0];
     const ep = getEspCoord(pin.connectTo);
-    const hex = WHex[pin.color] || WHex.red;
+    const hex = WHex[pin.color] ?? WHex.red;
     const epKey = PMAP[pin.connectTo] ?? pin.connectTo;
     const hasR = needsResistor(cfg.type, pin.name);
-    const rY = hasR ? resRowY(i) : 0;
+    const row = 3 + i * 2;
 
     steps.push({
       instr: hasR
-        ? `⚡ Place 220Ω resistor in breadboard row ${3 + i * 2}. Then connect ${label} ${pin.name} → row ${3 + i * 2} → ESP32 ${pin.connectTo} (${pin.color} wire)`
-        : `Connect ${label} ${pin.name} → ESP32 ${pin.connectTo} using ${pin.color} wire`,
-      why: WHY_MAP[pin.name] || `Connects ${label} ${pin.name} to ESP32 ${pin.connectTo}.`,
+        ? `Place a 220Ω resistor in breadboard row ${row}, then wire ${label} ${pin.name} through row ${row} to ESP32 ${pin.connectTo} (${pin.color} wire).`
+        : `Connect ${label} ${pin.name} to ESP32 ${pin.connectTo} with the ${pin.color} wire.`,
+      why: WHY_MAP[pin.name] ?? `Links ${label} ${pin.name} to ESP32 ${pin.connectTo}.`,
       wire: {
         x1: CORG.x + cp.cx, y1: CORG.y + cp.cy,
         x2: ep.x, y2: ep.y,
         color: hex,
         label: `${pin.color} · ${pin.name} → ${pin.connectTo}${hasR ? ' (via 220Ω)' : ''}`,
         cpName: pin.name, epKey, side: ep.side,
-        hasR, resY: rY, pinIdx: i,
-        laneOffset: i, // each wire gets its own lane to prevent overlap
+        hasR, resY: hasR ? resRowY(i) : 0, pinIdx: i,
+        laneOffset: i,
       },
       logText: `${pin.name} → ${pin.connectTo}${hasR ? ' [220Ω]' : ''}`,
       logColor: hex,
@@ -269,10 +270,11 @@ function buildSteps(cfg: ComponentConfig): Step[] {
   });
 
   steps.push({
-    instr: '✅ All connections complete! Click ▶ Run to simulate.',
-    why: 'Every pin is wired. Current can flow through all components now.',
+    instr: 'All connections complete. Press Run to simulate the circuit.',
+    why: 'Every pin is wired, so current can now flow through all components.',
     wire: null, logText: 'Circuit verified.', logColor: '#48bb78',
   });
+
   return steps;
 }
 
@@ -1724,7 +1726,9 @@ export default function DynamicWiringSimulator({ component }: { component: Compo
               {/* Why card */}
               <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #1e3a5a' }}>
                 <div style={{ padding: '8px 14px', background: '#0d1e38', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14 }}>💡</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" />
+                  </svg>
                   <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 700, letterSpacing: 0.5 }}>Why this connection?</span>
                 </div>
                 <div style={{ padding: '12px 14px', background: '#080f1e' }}>

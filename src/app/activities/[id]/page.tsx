@@ -1,10 +1,7 @@
+// src/app/activities/[id]/page.tsx
 'use client';
 
-// src/app/activities/[id]/page.tsx — FULL REDESIGN
-// Replace your existing file entirely with this
-
-import { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAppStore } from '@/store/useAppStore';
@@ -14,59 +11,123 @@ import { runLoop, stopSimulation } from '@/lib/simulatorEngine';
 import { deriveHardwareLayout } from '@/lib/hardwareParser';
 import HardwareBoard from '@/components/HardwareBoard';
 import DynamicWiringSimulator from '@/components/DynamicWiringSimulator';
-import { createClient } from '@/utils/supabase/client';
-import type { Activity } from '@/types/activity';
+type Activity = any;
 
+/* ── tokens — exact dashboard ── */
+const BG = '#04080f';
+const PANEL = '#0a1422';
+const CARD = '#0f1c30';
+const LINE = 'rgba(255,255,255,0.08)';
+const LINE_S = 'rgba(255,255,255,0.05)';
+const TEXT = '#ffffff';
+const MUTED = 'rgba(234,240,250,0.55)';
+const FAINT = 'rgba(234,240,250,0.35)';
+const BLUE = '#3b82f6';
+const BLUE_LT = '#93c5fd';
+const AMBER = '#f59e0b';
+const GREEN = '#10b981';
+const GREEN_LT = '#34d399';
+const VIOLET = '#8b5cf6';
+const SANS = '"Space Grotesk",sans-serif';
+const MONO = '"JetBrains Mono",monospace';
+const INTER = '"Inter",system-ui,sans-serif';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+function hexA(hex: string, a: number) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${a})`;
+}
 
+/* ── step definitions (no emojis) ── */
 const STEPS = [
-  { id: 0, label: 'Intro', icon: '📋', time: '2 min' },
-  { id: 1, label: 'Equipment', icon: '🔧', time: '5 min' },
-  { id: 2, label: 'Assemble', icon: '🛠️', time: '10 min' },
-  { id: 3, label: 'Code', icon: '💻', time: '10 min' },
-  { id: 4, label: 'Output', icon: '📊', time: '3 min' },
+  { id: 0, label: 'Intro', time: '2 min' },
+  { id: 1, label: 'Equipment', time: '5 min' },
+  { id: 2, label: 'Assemble', time: '10 min' },
+  { id: 3, label: 'Code', time: '10 min' },
+  { id: 4, label: 'Output', time: '3 min' },
 ];
 
-const DIFF_CONFIG: Record<string, { label: string; color: string; stars: string }> = {
-  Beginner: { label: 'Easy', color: 'bg-emerald-100 text-emerald-700', stars: '⭐' },
-  Intermediate: { label: 'Medium', color: 'bg-amber-100 text-amber-700', stars: '⭐⭐' },
-  Advanced: { label: 'Hard', color: 'bg-red-100 text-red-700', stars: '⭐⭐⭐' },
+/* ── SVG icons ── */
+const Ic = {
+  check: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M4 12l5 5L20 6" /></svg>,
+  arrow: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M5 12h14M12 5l7 7-7 7" /></svg>,
+  arrowL: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M19 12H5M12 19l-7-7 7-7" /></svg>,
+  lock: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="4" y="11" width="16" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>,
+  play: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><polygon points="5 3 19 12 5 21 5 3" /></svg>,
+  stop: (p: any) => <svg viewBox="0 0 24 24" fill="currentColor" {...p}><rect x="4" y="4" width="16" height="16" rx="2" /></svg>,
+  copy: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>,
+  chip: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4" /></svg>,
+  bolt: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg>,
+  tool: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg>,
+  target: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.5" /></svg>,
+  info: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>,
+  terminal: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>,
+  cpu: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="5" y="5" width="14" height="14" rx="2" /><rect x="9" y="9" width="6" height="6" rx="1" /><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></svg>,
+  wire: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><circle cx="5" cy="6" r="2" /><circle cx="19" cy="18" r="2" /><path d="M7 6h6a4 4 0 0 1 4 4v6" /></svg>,
+  video: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>,
+  blocks: (p: any) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>,
 };
 
-// ─── Animated Step Content Wrapper ───────────────────────────────────────────
+/* ── circuit bg — dashboard identical ── */
+function CircuitBg() {
+  return (
+    <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+      <svg width="100%" height="100%" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 600"
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          maskImage: 'linear-gradient(180deg,black 0%,rgba(0,0,0,0.5) 45%,transparent 85%)',
+          WebkitMaskImage: 'linear-gradient(180deg,black 0%,rgba(0,0,0,0.5) 45%,transparent 85%)'
+        }}>
+        <defs>
+          <pattern id="bm-cir" width="200" height="200" patternUnits="userSpaceOnUse">
+            <g fill="none" stroke="#3b82f6" strokeWidth="1.4" strokeLinecap="round" strokeOpacity="0.16">
+              <path d="M10 30 H70 a10 10 0 0 0 10-10 V0" />
+              <path d="M0 90 H50 a12 12 0 0 1 12 12 V150" />
+              <path d="M200 40 H150 a10 10 0 0 1-10 10 V120 a14 14 0 0 0 14 14 H200" />
+              <path d="M30 200 V150 a10 10 0 0 1 10-10 H110" />
+              <path d="M120 0 V40 a10 10 0 0 0 10 10 H180 a12 12 0 0 1 12 12 V120" />
+              <path d="M70 200 V170 H140 a10 10 0 0 0 10-10 V110" />
+              <path d="M0 150 H30" /><path d="M160 200 V175 a8 8 0 0 1 8-8 H200" />
+            </g>
+            <g fill="#3b82f6">
+              {([[10, 30], [80, 0], [0, 90], [62, 150], [150, 40], [200, 134], [30, 200], [110, 140], [120, 0], [192, 120], [70, 200], [150, 110], [0, 150], [160, 200], [200, 167]] as [number, number][]).map(([x, y], i) => (
+                <g key={i} style={{ animation: `bm-pad ${5 + (i % 5)}s ease-in-out ${i * 0.4}s infinite` }}>
+                  <circle cx={x} cy={y} r="3.4" fillOpacity="0.22" />
+                  <circle cx={x} cy={y} r="1.5" fillOpacity="0.5" />
+                </g>
+              ))}
+            </g>
+          </pattern>
+        </defs>
+        <rect width="800" height="600" fill="url(#bm-cir)" />
+      </svg>
+    </div>
+  );
+}
 
+/* ── step content animation ── */
 function StepContent({ children, stepKey }: { children: React.ReactNode; stepKey: number }) {
-  const [visible, setVisible] = useState(false);
+  const [vis, setVis] = useState(false);
   useEffect(() => {
-    setVisible(false);
-    const t = setTimeout(() => setVisible(true), 50);
+    setVis(false);
+    const t = setTimeout(() => setVis(true), 40);
     return () => clearTimeout(t);
   }, [stepKey]);
-
   return (
-    <div
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(12px)',
-        transition: 'opacity 0.25s ease, transform 0.25s ease',
-      }}
-    >
+    <div style={{ opacity: vis ? 1 : 0, transform: vis ? 'none' : 'translateY(10px)', transition: 'opacity .22s ease, transform .22s ease' }}>
       {children}
     </div>
   );
 }
 
-// ─── Inline All-in-One Simulator ────────────────────────────────────────────
-
+/* ══════════════ INLINE SIMULATOR ══════════════ */
 function InlineSimulator({ activity }: { activity: any }) {
   const { serial, isRunning } = useSimulatorStore();
-  const addBlock = useAppStore((s) => s.addBlock);
-  const clearBlocks = useAppStore((s) => s.clearBlocks);
-  const blocks = useAppStore((s) => s.blocks);
+  const addBlock = useAppStore(s => s.addBlock);
+  const clearBlocks = useAppStore(s => s.clearBlocks);
+  const blocks = useAppStore(s => s.blocks);
   const router = useRouter();
-
-  const [activeTab, setActiveTab] = useState<'hardware' | 'code' | 'serial'>('hardware');
+  const [tab, setTab] = useState<'hardware' | 'code' | 'serial'>('hardware');
 
   useEffect(() => {
     clearBlocks();
@@ -75,115 +136,82 @@ function InlineSimulator({ activity }: { activity: any }) {
     );
   }, [activity.id]);
 
-  const handleRunToggle = () => {
-    if (isRunning) stopSimulation();
-    else runLoop(blocks);
-  };
+  const peripherals = useMemo(() => deriveHardwareLayout(blocks), [blocks]);
 
-  const peripherals = useCallback(() => deriveHardwareLayout(blocks), [blocks])();
-
-  const tabs = [
-    { id: 'hardware', label: '🔌 Hardware' },
-    { id: 'code', label: '💻 Code' },
-    { id: 'serial', label: `📟 Serial${serial.length > 0 ? ` (${serial.length})` : ''}` },
-  ] as const;
+  const SIM_TABS = useMemo(() => [
+    { id: 'hardware' as const, label: 'Hardware' },
+    { id: 'code' as const, label: 'Code' },
+    { id: 'serial' as const, label: `Serial${serial.length > 0 ? ` (${serial.length})` : ''}` },
+  ], [serial.length]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-extrabold text-[#1a2d45]">ESP32 Simulator</span>
+    <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}`, background: PANEL }}>
+      {/* toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: TEXT, fontFamily: SANS }}>ESP32 Simulator</span>
           {isRunning && (
-            <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
-              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 99, border: `1px solid ${hexA(GREEN, 0.3)}`, background: hexA(GREEN, 0.1), padding: '2px 9px', fontSize: 10, fontWeight: 700, color: GREEN_LT }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: GREEN, animation: 'bm-pulse 1.2s infinite' }} />
               Running
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button type="button"
             onClick={() => { clearBlocks(); activity.playgroundBlocks?.forEach((b: any) => addBlock({ type: b.type, icon: b.icon, label: b.label, params: b.params, values: b.values })); router.push('/'); }}
-            className="text-[10px] font-semibold text-gray-400 transition-colors hover:text-[#1a2d45]"
-          >
-            Open full ↗
+            style={{ fontSize: 10, fontWeight: 600, color: FAINT, background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>
+            Open full
           </button>
-          <button
-            type="button"
-            onClick={handleRunToggle}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-extrabold text-white transition-all duration-200 active:scale-95 ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1a2d45] hover:bg-[#243d5a]'
-              }`}
-          >
-            {isRunning ? '⏹ Stop' : '▶ Run'}
+          <button type="button" onClick={() => isRunning ? stopSimulation() : runLoop(blocks)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 9, padding: '7px 14px', fontSize: 11, fontWeight: 700, color: '#fff', border: 'none', cursor: 'pointer', background: isRunning ? '#ef4444' : `linear-gradient(135deg,#1a3a8a,${BLUE})`, fontFamily: SANS }}>
+            {isRunning ? <><Ic.stop width={10} height={10} /> Stop</> : <><Ic.play width={10} height={10} /> Run</>}
           </button>
         </div>
       </div>
 
-      <div className="flex border-b border-gray-100 bg-white px-4">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setActiveTab(t.id)}
-            className={`mr-1 border-b-2 px-3 py-2.5 text-[11px] font-bold transition-all duration-150 ${activeTab === t.id
-                ? 'border-[#1a2d45] text-[#1a2d45]'
-                : 'border-transparent text-gray-400 hover:text-[#1a2d45]'
-              }`}
-          >
-            {t.label}
-          </button>
+      {/* tabs */}
+      <div style={{ display: 'flex', padding: '0 16px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+        {SIM_TABS.map(t => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)} style={{
+            padding: '9px 12px', fontSize: 11, fontWeight: 700, fontFamily: SANS, border: 'none', cursor: 'pointer', background: 'none',
+            borderBottom: tab === t.id ? `2px solid ${BLUE}` : '2px solid transparent',
+            color: tab === t.id ? BLUE_LT : FAINT,
+            transition: 'color .15s',
+          }}>{t.label}</button>
         ))}
       </div>
 
-      <div className="min-h-[340px]">
-        {activeTab === 'hardware' && (
-          <div className="h-[340px] w-full">
-            {peripherals.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                <span className="text-4xl">🔌</span>
-                <p className="text-sm font-bold text-gray-400">No hardware detected</p>
-                <p className="text-xs leading-relaxed text-gray-300">
-                  Blocks like LED, buzzer, and button will appear here automatically.
-                </p>
+      {/* content */}
+      <div style={{ minHeight: 520 }}>
+        {tab === 'hardware' && (
+          <div style={{ height: 520 }}>
+            {peripherals.length === 0
+              ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 8 }}>
+                <Ic.cpu width={28} height={28} style={{ color: FAINT }} />
+                <p style={{ fontSize: 12, fontWeight: 700, color: FAINT, fontFamily: SANS }}>No hardware detected</p>
+                <p style={{ fontSize: 11, color: FAINT, fontFamily: INTER, textAlign: 'center', maxWidth: 240 }}>Blocks like LED, buzzer, and button appear here automatically.</p>
               </div>
-            ) : (
-              <HardwareBoard peripherals={peripherals} />
-            )}
+              : <HardwareBoard peripherals={peripherals} />
+            }
           </div>
         )}
-
-        {activeTab === 'code' && (
-          <div className="h-[340px] overflow-auto bg-[#0d1b2a] p-5">
-            <pre className="text-[11px] leading-relaxed text-emerald-300">
-              <code>{activity.code.arduino}</code>
-            </pre>
+        {tab === 'code' && (
+          <div style={{ height: 520, overflow: 'auto', background: '#060e18', padding: 20 }}>
+            <pre style={{ margin: 0, fontSize: 11, lineHeight: 1.7, color: GREEN_LT, fontFamily: MONO }}><code>{activity.code?.arduino}</code></pre>
           </div>
         )}
-
-        {activeTab === 'serial' && (
-          <div className="flex h-[340px] flex-col bg-[#0d1b2a]">
-            <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
-              <span className="text-[10px] font-bold text-white/30">115200 baud</span>
-              {serial.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => useSimulatorStore.getState().resetSimulation()}
-                  className="text-[10px] font-bold text-red-400 transition-colors hover:text-red-300"
-                >
-                  Clear
-                </button>
-              )}
+        {tab === 'serial' && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: 520, background: '#060e18' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 16px', borderBottom: `1px solid ${LINE_S}` }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: FAINT, fontFamily: MONO }}>115200 baud</span>
+              {serial.length > 0 && <button type="button" onClick={() => useSimulatorStore.getState().resetSimulation()} style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>Clear</button>}
             </div>
-            <div className="flex-1 space-y-1 overflow-y-auto p-4">
-              {serial.length === 0 ? (
-                <p className="text-[11px] italic text-white/20">Press Run to start...</p>
-              ) : (
-                serial.map((line, i) => (
-                  <p key={i} className="font-mono text-[11px] text-emerald-400">
-                    <span className="mr-2 text-white/20">{'>'}</span>{line}
-                  </p>
-                ))
-              )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+              {serial.length === 0
+                ? <p style={{ fontSize: 11, fontStyle: 'italic', color: FAINT, fontFamily: MONO }}>Press Run to start…</p>
+                : serial.map((l, i) => <p key={i} style={{ margin: '0 0 2px', fontSize: 11, fontFamily: MONO, color: GREEN_LT }}><span style={{ color: FAINT, marginRight: 8 }}>{'>'}</span>{l}</p>)
+              }
             </div>
           </div>
         )}
@@ -192,69 +220,63 @@ function InlineSimulator({ activity }: { activity: any }) {
   );
 }
 
-// ─── Step 0: Intro ────────────────────────────────────────────────────────────
+/* ══════════════ STEP PANELS ══════════════ */
 
 function IntroStep({ activity }: { activity: any }) {
+  const DIFF: Record<string, string> = { Beginner: GREEN, Intermediate: AMBER, Advanced: '#ef4444' };
+  const color = DIFF[activity.difficulty] ?? BLUE;
   return (
-    <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-3xl bg-[#1a2d45] p-7 text-white">
-        <div className="pointer-events-none absolute -right-6 -top-6 select-none text-[130px] opacity-[0.07]">
-          {activity.icon}
-        </div>
-        <div className="relative">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-amber-400/20 px-3 py-1">
-            <span className="text-sm">{activity.icon}</span>
-            <span className="text-[11px] font-bold uppercase tracking-widest text-amber-300">
-              {activity.difficulty} Project
-            </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* hero card */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: '28px 28px 24px', background: `linear-gradient(160deg,${BG} 0%,#060d19 60%,${BG} 100%)`, border: `1px solid ${hexA(color, 0.3)}`, boxShadow: `0 0 0 1px ${hexA(color, 0.1)}` }}>
+        <div style={{ position: 'absolute', top: -80, right: -40, width: 260, height: 260, borderRadius: '50%', background: `radial-gradient(circle,${hexA(color, 0.18)},transparent 60%)`, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', height: 3, top: 0, left: 0, right: 0, background: `linear-gradient(90deg,${color},${hexA(color, 0.2)})` }} />
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '3px 11px', borderRadius: 99, marginBottom: 14, background: hexA(color, 0.12), border: `1px solid ${hexA(color, 0.25)}` }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: color }} />
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color, fontFamily: MONO }}>{activity.difficulty} Project</span>
           </div>
-          <h2 className="text-xl font-extrabold leading-snug">{activity.intro_headline}</h2>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              ⏱ {activity.duration}
+          <h2 style={{ margin: '0 0 12px', fontSize: 'clamp(1.2rem,2.5vw,1.6rem)', fontWeight: 700, color: TEXT, fontFamily: SANS, lineHeight: 1.2 }}>{activity.intro_headline}</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', padding: '4px 11px', fontSize: 11, fontWeight: 600, color: MUTED, fontFamily: MONO }}>
+              <Ic.chip width={11} height={11} /> {activity.duration}
             </span>
-            <span className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
-              🔧 {activity.equipment?.length} parts
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 99, background: 'rgba(255,255,255,0.07)', padding: '4px 11px', fontSize: 11, fontWeight: 600, color: MUTED, fontFamily: MONO }}>
+              <Ic.tool width={11} height={11} /> {activity.equipment?.length} parts
             </span>
-            {activity.tags.map((tag: string) => (
-              <span key={tag} className="rounded-full bg-white/10 px-3 py-1 text-[11px] text-white/70">
-                {tag}
-              </span>
+            {activity.tags?.map((tag: string) => (
+              <span key={tag} style={{ borderRadius: 99, background: 'rgba(255,255,255,0.05)', padding: '4px 11px', fontSize: 11, color: FAINT, fontFamily: MONO }}>{tag}</span>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="group rounded-2xl border-2 border-dashed border-[#1a2d45]/20 bg-white p-5 shadow-sm transition-all duration-200 hover:border-[#1a2d45]/40 hover:shadow-md">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1a2d45] text-sm">🎯</div>
-            <h3 className="font-extrabold text-[#1a2d45]">What you will build</h3>
+      {/* what + why */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14 }}>
+        {[
+          { Icon: Ic.target, title: 'What you will build', body: activity.intro_what, accent: BLUE },
+          { Icon: Ic.info, title: 'Why this matters', body: activity.intro_why, accent: AMBER },
+        ].map(c => (
+          <div key={c.title} className="bm-card" style={{ borderRadius: 16, padding: 20, background: CARD, border: `1px solid ${LINE}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: hexA(c.accent, 0.14), color: c.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><c.Icon width={17} height={17} /></span>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: TEXT, fontFamily: SANS }}>{c.title}</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: 13, color: MUTED, lineHeight: 1.65, fontFamily: INTER }}>{c.body}</p>
           </div>
-          <p className="text-sm leading-relaxed text-gray-500">{activity.intro_what}</p>
-        </div>
-        <div className="group rounded-2xl border-2 border-dashed border-[#1a2d45]/20 bg-white p-5 shadow-sm transition-all duration-200 hover:border-[#1a2d45]/40 hover:shadow-md">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-400 text-sm">💡</div>
-            <h3 className="font-extrabold text-[#1a2d45]">Why this matters</h3>
-          </div>
-          <p className="text-sm leading-relaxed text-gray-500">{activity.intro_why}</p>
-        </div>
+        ))}
       </div>
 
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500 text-sm">🏆</div>
-          <h3 className="font-extrabold text-[#1a2d45]">Skills you will unlock</h3>
+      {/* skills */}
+      <div className="bm-card" style={{ borderRadius: 16, padding: 20, background: CARD, border: `1px solid ${LINE}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <span style={{ width: 34, height: 34, borderRadius: 10, background: hexA(GREEN, 0.14), color: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.bolt width={17} height={17} /></span>
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Skills you will unlock</h3>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {activity.teaches.map((t: string, i: number) => (
-            <span
-              key={t}
-              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <span className="text-emerald-400">✦</span> {t}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+          {activity.teaches?.map((t: string) => (
+            <span key={t} style={{ display: 'flex', alignItems: 'center', gap: 5, borderRadius: 99, border: `1px solid ${hexA(GREEN, 0.25)}`, background: hexA(GREEN, 0.1), padding: '5px 11px', fontSize: 11, fontWeight: 700, color: GREEN_LT, fontFamily: MONO }}>
+              <Ic.check width={9} height={9} /> {t}
             </span>
           ))}
         </div>
@@ -263,111 +285,116 @@ function IntroStep({ activity }: { activity: any }) {
   );
 }
 
-// ─── Step 1: Equipment ────────────────────────────────────────────────────────
-
 function EquipmentStep({ activity }: { activity: any }) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-3xl bg-[#1a2d45] p-6 text-white">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/20 text-xl">🔧</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* header card */}
+      <div style={{ borderRadius: 16, padding: '18px 20px', background: PANEL, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ width: 42, height: 42, borderRadius: 12, background: hexA(AMBER, 0.14), color: AMBER, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.tool width={20} height={20} /></span>
           <div>
-            <h2 className="font-extrabold">Gather Your Parts</h2>
-            <p className="text-[11px] text-white/60">Get everything ready before you start building!</p>
+            <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Gather Your Parts</p>
+            <p style={{ margin: 0, fontSize: 11.5, color: MUTED, fontFamily: INTER }}>Get everything ready before you start building.</p>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/10 px-4 py-2.5">
-          <p className="text-[11px] font-semibold text-white/80">
-            🛒 {activity.equipment.length} items needed
-          </p>
-        </div>
+        <span style={{ padding: '4px 12px', borderRadius: 99, background: hexA(AMBER, 0.12), border: `1px solid ${hexA(AMBER, 0.25)}`, fontSize: 10, fontWeight: 700, color: AMBER, fontFamily: MONO, whiteSpace: 'nowrap' }}>
+          {activity.equipment?.length} items
+        </span>
       </div>
 
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-        <div className="divide-y divide-gray-100">
-          {activity.equipment.map((item: any, idx: number) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-[#f8f9fb]"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1a2d45] text-[11px] font-bold text-white">
-                  {idx + 1}
-                </div>
-                <div>
-                  <p className="text-[13px] font-bold text-[#1a2d45]">{item.name}</p>
-                  <p className="text-[11px] text-gray-400">{item.description}</p>
-                </div>
+      {/* list */}
+      <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+        {activity.equipment?.map((item: any, idx: number) => (
+          <div key={idx} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '14px 18px', background: idx % 2 === 0 ? CARD : hexA(BLUE, 0.03),
+            borderBottom: idx < activity.equipment.length - 1 ? `1px solid ${LINE_S}` : 'none',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: SANS, flexShrink: 0 }}>
+                {idx + 1}
               </div>
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[11px] font-extrabold text-amber-700">
-                {item.quantity}
+              <div>
+                <p style={{ margin: '0 0 2px', fontSize: 13, fontWeight: 700, color: TEXT, fontFamily: SANS }}>{item.name}</p>
+                <p style={{ margin: 0, fontSize: 11, color: MUTED, fontFamily: INTER }}>{item.description}</p>
               </div>
             </div>
-          ))}
-        </div>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: hexA(AMBER, 0.14), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: AMBER, fontFamily: SANS, flexShrink: 0 }}>
+              {item.quantity}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-// ─── Step 2: Assemble ─────────────────────────────────────────────────────────
-
 function AssembleStep({ activity }: { activity: any }) {
   const hasWiring = !!activity.wiringComponent;
   const [view, setView] = useState<'wiring' | 'video'>(hasWiring ? 'wiring' : 'video');
+  const tabs = useMemo(() => [
+    ...(hasWiring ? [{ id: 'wiring' as const, label: 'Wire It Up', Icon: Ic.wire }] : []),
+    { id: 'video' as const, label: 'Video Tutorial', Icon: Ic.video },
+  ], [hasWiring]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-1.5 rounded-2xl bg-[#f0f2f5] p-1.5">
-        {[
-          ...(hasWiring ? [{ id: 'wiring' as const, label: '🔌 Wire It Up' }] : []),
-          { id: 'video' as const, label: '▶ Video' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setView(t.id)}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[12px] font-semibold transition-all duration-200 ${view === t.id
-                ? 'bg-white text-[#1a2d45] shadow-sm'
-                : 'text-gray-400 hover:text-[#1a2d45]'
-              }`}
-          >
-            {t.label}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* tab pills */}
+      <div style={{ display: 'flex', gap: 6, padding: '5px', borderRadius: 14, background: PANEL, border: `1px solid ${LINE}` }}>
+        {tabs.map(t => (
+          <button key={t.id} type="button" onClick={() => setView(t.id)} style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: view === t.id ? CARD : 'transparent',
+            color: view === t.id ? TEXT : MUTED,
+            fontSize: 12, fontWeight: 700, fontFamily: SANS,
+            boxShadow: view === t.id ? `0 2px 8px rgba(0,0,0,0.3)` : 'none',
+            transition: 'all .15s',
+          }}>
+            <t.Icon width={13} height={13} /> {t.label}
           </button>
         ))}
       </div>
 
       {view === 'wiring' && activity.wiringComponent && (
-        <DynamicWiringSimulator component={activity.wiringComponent} />
+        <div
+          style={{
+            width: '1400px',
+            maxWidth: 'calc(100vw - 320px)',
+            marginLeft: '50%',
+            transform: 'translateX(-50%)',
+            borderRadius: 16,
+            overflow: 'hidden',
+            border: `1px solid ${LINE}`,
+            minHeight: 520,
+          }}
+        >
+          <DynamicWiringSimulator component={activity.wiringComponent} />
+        </div>
       )}
 
       {view === 'video' && (
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-3">
-            <p className="text-[12px] font-semibold text-[#1a2d45]">▶ Video Tutorial</p>
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 16px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+            <Ic.video width={14} height={14} style={{ color: BLUE_LT }} />
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Video Tutorial</p>
           </div>
-          <iframe
-            src={activity.assemble.videoUrl}
-            className="h-[400px] w-full"
-            title="Video Tutorial"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+          <iframe src={activity.assemble?.videoUrl} style={{ display: 'block', width: '100%', height: 520, border: 'none' }}
+            title="Video Tutorial" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         </div>
       )}
 
-      <div className="rounded-2xl bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#1a2d45] text-sm">🛠️</div>
-          <h3 className="text-[13px] font-semibold text-[#1a2d45]">Wiring steps</h3>
+      {/* wiring steps */}
+      <div style={{ borderRadius: 16, padding: 20, background: CARD, border: `1px solid ${LINE}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ width: 32, height: 32, borderRadius: 9, background: hexA(BLUE, 0.14), color: BLUE_LT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.wire width={16} height={16} /></span>
+          <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Wiring steps</h3>
         </div>
-        <div className="space-y-2">
-          {activity.assemble.steps.map((step: string, idx: number) => (
-            <div key={idx} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-[#f8f9fb] px-4 py-3 transition-all hover:border-[#1a2d45]/20 hover:bg-[#f0f4f8]">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1a2d45] text-[10px] font-semibold text-white mt-0.5">
-                {idx + 1}
-              </div>
-              <p className="text-[13px] leading-relaxed text-gray-600">{step}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {activity.assemble?.steps?.map((step: string, idx: number) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, borderRadius: 10, border: `1px solid ${LINE}`, padding: '11px 14px', background: PANEL }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', fontFamily: SANS, flexShrink: 0, marginTop: 1 }}>{idx + 1}</div>
+              <p style={{ margin: 0, fontSize: 13, color: MUTED, lineHeight: 1.65, fontFamily: INTER }}>{step}</p>
             </div>
           ))}
         </div>
@@ -376,83 +403,80 @@ function AssembleStep({ activity }: { activity: any }) {
   );
 }
 
-
-// ─── Step 3: Code ─────────────────────────────────────────────────────────────
-
 function CodeStep({ activity }: { activity: any }) {
   const router = useRouter();
-  const clearBlocks = useAppStore((s) => s.clearBlocks);
-  const addBlock = useAppStore((s) => s.addBlock);
+  const addBlock = useAppStore(s => s.addBlock);
+  const clearBlocks = useAppStore(s => s.clearBlocks);
   const [tab, setTab] = useState<'platform' | 'arduino'>('platform');
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(activity.code.arduino);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(activity.code?.arduino ?? '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }, [activity.code?.arduino]);
 
-  const openPlayground = () => {
-    clearBlocks();
-    activity.playgroundBlocks?.forEach((b: any) =>
-      addBlock({ type: b.type, icon: b.icon, label: b.label, params: b.params, values: b.values })
-    );
-    router.push('/');
-  };
+  const CODE_TABS = [
+    { id: 'platform' as const, label: 'Our Platform', Icon: Ic.blocks },
+    { id: 'arduino' as const, label: 'Arduino IDE', Icon: Ic.chip },
+  ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-1.5 rounded-2xl bg-[#f0f2f5] p-1.5">
-        {([
-          { id: 'platform', label: '🧩 Our Platform' },
-          { id: 'arduino',  label: '⚙️ Arduino IDE'  },
-        ] as const).map((t) => (
-          <button key={t.id} type="button" onClick={() => setTab(t.id)}
-            className={`flex flex-1 items-center justify-center rounded-xl py-2.5 text-[12px] font-bold transition-all duration-200 ${
-              tab === t.id ? 'bg-white text-[#1a2d45] shadow-sm' : 'text-gray-400 hover:text-[#1a2d45]'
-            }`}>
-            {t.label}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', gap: 6, padding: '5px', borderRadius: 14, background: PANEL, border: `1px solid ${LINE}` }}>
+        {CODE_TABS.map(t => (
+          <button key={t.id} type="button" onClick={() => setTab(t.id)} style={{
+            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+            padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: tab === t.id ? CARD : 'transparent',
+            color: tab === t.id ? TEXT : MUTED,
+            fontSize: 12, fontWeight: 700, fontFamily: SANS,
+            boxShadow: tab === t.id ? `0 2px 8px rgba(0,0,0,0.3)` : 'none',
+            transition: 'all .15s',
+          }}>
+            <t.Icon width={13} height={13} /> {t.label}
           </button>
         ))}
       </div>
 
       {tab === 'platform' && (
-        <div className="space-y-3">
-          <div className="rounded-2xl bg-white p-5 shadow-sm">
-            <div className="flex items-start gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1a2d45] text-lg">🧩</div>
-              <div>
-                <p className="font-extrabold text-[#1a2d45]">Block Playground</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{activity.code.platformDescription}</p>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="bm-card" style={{ borderRadius: 16, padding: 18, background: CARD, border: `1px solid ${LINE}`, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <span style={{ width: 40, height: 40, borderRadius: 11, background: hexA(BLUE, 0.14), color: BLUE_LT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic.blocks width={20} height={20} /></span>
+            <div>
+              <p style={{ margin: '0 0 5px', fontSize: 14, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Block Playground</p>
+              <p style={{ margin: 0, fontSize: 12.5, color: MUTED, lineHeight: 1.6, fontFamily: INTER }}>{activity.code?.platformDescription}</p>
             </div>
           </div>
-          <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-              <p className="text-[11px] font-bold text-[#1a2d45]">▶ Run it here</p>
+          <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Live Simulator</span>
+              <button type="button" onClick={() => { clearBlocks(); activity.playgroundBlocks?.forEach((b: any) => addBlock({ type: b.type, icon: b.icon, label: b.label, params: b.params, values: b.values })); router.push('/'); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: BLUE_LT, background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>
+                Open full <Ic.arrow width={11} height={11} />
+              </button>
             </div>
-            <div className="p-4">
-              <InlineSimulator activity={activity} />
-            </div>
+            <div style={{ background: PANEL }}><InlineSimulator activity={activity} /></div>
           </div>
         </div>
       )}
 
       {tab === 'arduino' && (
-        <div className="overflow-hidden rounded-2xl bg-[#020508] shadow-sm">
-          <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
-            <span className="text-[10px] text-white/25 font-mono">{activity.title}.ino</span>
-            <button type="button" onClick={handleCopy}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all duration-200 ${
-                  copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/8 text-white/40 hover:bg-white/15 hover:text-white/70'
-                }`}>
-                {copied ? '✓ Copied!' : '📋 Copy'}
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderBottom: `1px solid ${LINE}`, background: CARD }}>
+            <span style={{ fontSize: 10, color: FAINT, fontFamily: MONO }}>{activity.title}.ino</span>
+            <button type="button" onClick={handleCopy} style={{
+              display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '5px 12px',
+              fontSize: 10, fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: SANS,
+              background: copied ? hexA(GREEN, 0.15) : 'rgba(255,255,255,0.06)',
+              color: copied ? GREEN_LT : FAINT,
+              transition: 'all .15s',
+            }}>
+              {copied ? <><Ic.check width={10} height={10} /> Copied</> : <><Ic.copy width={10} height={10} /> Copy</>}
             </button>
           </div>
-          <div className="overflow-auto p-5">
-            <pre className="text-[11px] leading-relaxed text-emerald-300">
-              <code>{activity.code.arduino}</code>
-            </pre>
+          <div style={{ overflow: 'auto', padding: 22, background: '#060e18', maxHeight: 600 }}>
+            <pre style={{ margin: 0, fontSize: 11, lineHeight: 1.75, color: GREEN_LT, fontFamily: MONO }}><code>{activity.code?.arduino}</code></pre>
           </div>
         </div>
       )}
@@ -460,20 +484,27 @@ function CodeStep({ activity }: { activity: any }) {
   );
 }
 
-// ─── Step 4: Output ───────────────────────────────────────────────────────────
-
 function OutputStep({ activity }: { activity: any }) {
   return (
-    <div className="space-y-4">
-      <div className="rounded-3xl bg-[#1a2d45] px-7 py-6 text-white">
-        <h2 className="text-lg font-extrabold">Expected Output</h2>
-        <p className="mt-0.5 text-[12px] text-white/50">{activity.output.description}</p>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 16, padding: 22, background: `linear-gradient(160deg,${BG} 0%,#060d19 100%)`, border: `1px solid ${hexA(GREEN, 0.3)}` }}>
+        <div style={{ position: 'absolute', top: -60, right: -30, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle,${hexA(GREEN, 0.15)},transparent 60%)`, pointerEvents: 'none' }} />
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, background: hexA(GREEN, 0.14), color: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Ic.terminal width={17} height={17} /></span>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: TEXT, fontFamily: SANS }}>Expected Output</h2>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: MUTED, fontFamily: INTER }}>{activity.output?.description}</p>
+        </div>
       </div>
-      <div className="overflow-hidden rounded-2xl bg-[#020508] shadow-sm">
-        <div className="space-y-0.5 p-5">
-          {activity.output.expected.map((line: string, idx: number) => (
-            <p key={idx} className="font-mono text-[11px] text-emerald-400">
-              <span className="mr-2 text-white/20">{'>'}</span>{line}
+      <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}` }}>
+        <div style={{ padding: '8px 16px', borderBottom: `1px solid ${LINE_S}`, background: CARD }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: FAINT, fontFamily: MONO, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Serial output</span>
+        </div>
+        <div style={{ padding: 20, background: '#060e18' }}>
+          {activity.output?.expected?.map((line: string, idx: number) => (
+            <p key={idx} style={{ margin: '0 0 3px', fontSize: 11.5, fontFamily: MONO, color: GREEN_LT }}>
+              <span style={{ color: FAINT, marginRight: 10 }}>{'>'}</span>{line}
             </p>
           ))}
         </div>
@@ -482,57 +513,43 @@ function OutputStep({ activity }: { activity: any }) {
   );
 }
 
-// ─── Confetti ─────────────────────────────────────────────────────────────────
-
+/* ── confetti ── */
 function useConfetti() {
-  const fire = () => {
-    const colors = ['#1a2d45', '#f59e0b', '#4ade80', '#a78bfa', '#60a5fa', '#ffffff'];
+  const fire = useCallback(() => {
     if (typeof window !== 'undefined' && (window as any).confetti) {
-      const c = (window as any).confetti;
-      c({ spread: 60, startVelocity: 45, particleCount: 60, colors, origin: { y: 0.6 } });
+      (window as any).confetti({ spread: 60, startVelocity: 45, particleCount: 60, colors: ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ffffff'], origin: { y: 0.6 } });
     }
-  };
+  }, []);
   return { fire };
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
+/* ══════════════ MAIN PAGE ══════════════ */
 export default function ActivityDetailPage() {
   const { id: activityId } = useParams() as { id: string };
   const router = useRouter();
   const { initialize, markStepComplete, markActivityComplete, getLastStep, isCompleted } = useActivityStore();
   const { fire: fireConfetti } = useConfetti();
 
-  const [activity, setActivity] = useState<Activity | undefined>(undefined);
+  const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [completed, setCompleted] = useState<number[]>([]);
-  const [justCompleted, setJustCompleted] = useState<number | null>(null);
+  const [justCompleted, setJustDone] = useState<number | null>(null);
 
-  // Load activity and initialize step state
-  useEffect(() => {
-    // Initialize store with authenticated user ID and activity count
-    initialize();
-  }, []);
+  useEffect(() => { initialize(); }, []);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // Fetch all activities from the API
         const res = await fetch('/api/activities');
         const data = await res.json();
         const act = data.find((a: any) => a.id === activityId);
-        setActivity(act);
-
-        // Initialize step progress from store
+        setActivity(act ?? null);
         const last = getLastStep(activityId);
         setCurrentStep(last);
         setCompleted(Array.from({ length: last }, (_, i) => i));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
     };
     load();
   }, [activityId]);
@@ -545,204 +562,208 @@ export default function ActivityDetailPage() {
     return () => { try { document.body.removeChild(s); } catch { } };
   }, []);
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-[#eef1f5]">
-        <Header />
-        <div className="flex flex-col items-center justify-center" style={{ minHeight: 'calc(100vh - 56px)' }}>
-          <div className="text-center">
-            <div className="relative mx-auto w-16 h-16 mb-6">
-              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45]/10" />
-              <div className="absolute inset-0 rounded-full border-4 border-[#1a2d45] border-t-transparent animate-spin" />
-              <div className="absolute inset-2 rounded-full border-4 border-amber-400/20" />
-              <div className="absolute inset-2 rounded-full border-4 border-amber-400 border-b-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
-            </div>
-            <h2 className="text-lg font-bold text-[#1a2d45]">Loading Activity</h2>
-            <p className="mt-2 text-xs text-gray-400">Loading project details...</p>
-            <div className="mt-4 mx-auto w-48 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-              <div className="h-full rounded-full bg-[#1a2d45] animate-pulse" style={{ width: '60%' }} />
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!activity) {
-    return (
-      <main className="min-h-screen bg-[#eef1f5]">
-        <Header />
-        <div className="flex flex-col items-center justify-center py-32">
-          <p className="text-5xl">😕</p>
-          <p className="mt-3 text-lg font-extrabold text-[#1a2d45]">Activity not found</p>
-          <button type="button" onClick={() => router.push('/activities')}
-            className="mt-4 rounded-xl bg-[#1a2d45] px-5 py-2 text-sm font-bold text-white transition-all hover:bg-[#243d5a]">
-            ← Back to Activities
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  const diffCfg = DIFF_CONFIG[activity.difficulty] ?? DIFF_CONFIG.Beginner;
-  const alreadyCompleted = isCompleted(activity.id);
-  const progressPercent = alreadyCompleted ? 100 : Math.round((completed.length / STEPS.length) * 100);
-
-  const handleStepChange = (step: number) => {
-    if (!completed.includes(currentStep)) {
-      setCompleted((p) => [...p, currentStep]);
-      markStepComplete(activity.id, currentStep);
-      setJustCompleted(currentStep);
-      setTimeout(() => setJustCompleted(null), 600);
-    }
+  const handleStepChange = useCallback((step: number) => {
+    setCompleted(prev => {
+      if (!prev.includes(currentStep)) {
+        markStepComplete(activityId, currentStep);
+        setJustDone(currentStep);
+        setTimeout(() => setJustDone(null), 600);
+        return [...prev, currentStep];
+      }
+      return prev;
+    });
     setCurrentStep(step);
-  };
+  }, [currentStep, activityId, markStepComplete]);
 
-  const handleDone = () => {
-    markStepComplete(activity.id, STEPS.length - 1);
-    markActivityComplete(activity.id);
+  const handleDone = useCallback(() => {
+    markStepComplete(activityId, STEPS.length - 1);
+    markActivityComplete(activityId);
     fireConfetti();
     setTimeout(() => router.push('/activities'), 2200);
-  };
+  }, [activityId, markStepComplete, markActivityComplete, fireConfetti, router]);
+
+  const alreadyDone = activity ? isCompleted(activity.id) : false;
+  const progressPercent = alreadyDone ? 100 : Math.round((completed.length / STEPS.length) * 100);
+
+  const DIFF_COLOR: Record<string, string> = { Beginner: GREEN, Intermediate: AMBER, Advanced: '#ef4444' };
+  const diffColor = activity ? (DIFF_COLOR[activity.difficulty] ?? BLUE) : BLUE;
+
+  /* ── loading ── */
+  if (loading) return (
+    <main style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: INTER }}>
+      <Header />
+      <style suppressHydrationWarning>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 56px)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ position: 'relative', width: 52, height: 52, margin: '0 auto 18px' }}>
+            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `3px solid ${LINE}` }} />
+            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `3px solid ${BLUE}`, borderTopColor: 'transparent', animation: 'spin .85s linear infinite' }} />
+          </div>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, fontFamily: SANS, color: MUTED }}>Loading mission…</p>
+        </div>
+      </div>
+    </main>
+  );
+
+  /* ── not found ── */
+  if (!activity) return (
+    <main style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: INTER }}>
+      <Header />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 24px' }}>
+        <p style={{ margin: '0 0 8px', fontSize: 15, fontWeight: 700, color: MUTED, fontFamily: SANS }}>Mission not found</p>
+        <button type="button" onClick={() => router.push('/activities')} style={{ marginTop: 12, padding: '9px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', background: BLUE, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: SANS }}>
+          Back to Activities
+        </button>
+      </div>
+    </main>
+  );
 
   return (
-    <main className="min-h-screen bg-[#eef1f5]">
+    <main style={{ minHeight: '100vh', background: BG, color: TEXT, fontFamily: INTER }}>
+      <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+      <style suppressHydrationWarning>{`
+        h1,h2,h3,h4 { font-family:${SANS}; }
+        @keyframes bm-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+        @keyframes bm-pad   { 0%,100%{opacity:.25} 50%{opacity:.9} }
+        @keyframes bm-rise  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
+        @keyframes spin     { to{transform:rotate(360deg)} }
+        .bm-card { transition: transform .28s cubic-bezier(0.16,1,0.3,1), box-shadow .28s, border-color .28s; }
+        .bm-ghost { transition: background .2s, border-color .2s; }
+        .bm-ghost:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.2) !important; }
+        .step-btn { transition: background .15s, color .15s; }
+        .step-btn:hover { background: rgba(255,255,255,0.07) !important; }
+        ::-webkit-scrollbar { width:3px; height:3px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:#1e3a5f; border-radius:99px; }
+        * { box-sizing:border-box; }
+      `}</style>
+
       <Header />
-
-      {/* Top amber progress bar */}
-      <div className="h-1 w-full bg-gray-200">
-        <div className="h-1 bg-amber-400 transition-all duration-700" style={{ width: `${progressPercent}%` }} />
+      {/* progress line */}
+      <div style={{ height: 3, background: LINE }}>
+        <div style={{ height: '100%', width: `${progressPercent}%`, background: `linear-gradient(90deg,${BLUE},${VIOLET} 60%,${AMBER})`, transition: 'width .7s ease' }} />
       </div>
+      <CircuitBg />
 
-      {/* ── CHANGE 1: Full width flex, no max-w, no padding, sidebar touches edge ── */}
-      <div className="flex" style={{ height: 'calc(100vh - 60px)' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 59px)', position: 'relative', zIndex: 1 }}>
 
-        {/* ── SIDEBAR — touches left edge, full height ── */}
-        {/* ── CHANGE 2: no rounded corners, no margin, bg directly on aside ── */}
-        <aside className="hidden w-56 shrink-0 md:flex md:flex-col bg-[#1a2d45] overflow-y-auto">
-          <div className="flex flex-col p-4 h-full">
+        {/* ══ SIDEBAR ══ */}
+        <aside style={{
+          width: 224, flexShrink: 0, display: 'flex', flexDirection: 'column',
+          background: `linear-gradient(180deg,#060e1a 0%,${PANEL} 100%)`,
+          borderRight: `1px solid ${LINE}`, overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', padding: 18, height: '100%' }}>
 
-            <button
-              type="button"
-              onClick={() => router.push('/activities')}
-              className="mb-4 flex items-center gap-2 text-[11px] font-semibold text-white/40 transition-colors hover:text-white/70"
-            >
-              ← Activities
+            {/* back */}
+            <button type="button" onClick={() => router.push('/activities')} className="bm-ghost"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 18, padding: '7px 10px', borderRadius: 9, border: `1px solid transparent`, background: 'transparent', cursor: 'pointer', color: FAINT, fontSize: 11, fontWeight: 600, fontFamily: SANS }}>
+              <Ic.arrowL width={12} height={12} /> Activities
             </button>
 
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-white/30">Project</p>
-            <p className="mb-4 text-[12px] font-extrabold leading-snug text-white">{activity.title}</p>
+            {/* title */}
+            <p style={{ margin: '0 0 2px', fontSize: 9, fontWeight: 700, color: FAINT, fontFamily: MONO, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Mission</p>
+            <p style={{ margin: '0 0 16px', fontSize: 13, fontWeight: 700, color: TEXT, fontFamily: SANS, lineHeight: 1.3 }}>{activity.title}</p>
 
-            <div className="mb-5">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-[10px] text-white/30">Progress</span>
-                <span className="text-[10px] font-bold text-emerald-400">{progressPercent}%</span>
+            {/* progress bar */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 9, color: FAINT, fontFamily: MONO }}>Progress</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: GREEN_LT, fontFamily: SANS }}>{progressPercent}%</span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full rounded-full bg-emerald-400 transition-all duration-700" style={{ width: `${progressPercent}%` }} />
+              <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 99, background: `linear-gradient(90deg,${GREEN},${BLUE})`, width: `${progressPercent}%`, transition: 'width .7s ease' }} />
               </div>
             </div>
 
-            <div className="flex flex-col">
+            {/* steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               {STEPS.map((step, idx) => {
                 const isDone = completed.includes(step.id);
                 const isActive = currentStep === step.id;
-                const isBouncing = justCompleted === step.id;
+                const isBounce = justCompleted === step.id;
+
                 return (
-                  <div key={step.id} className="flex flex-col">
-                    <button
-                      type="button"
-                      onClick={() => handleStepChange(step.id)}
-                      className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${isActive
-                          ? 'bg-white/15 text-white'
-                          : isDone
-                            ? 'text-emerald-400 hover:bg-white/8'
-                            : 'text-white/35 hover:bg-white/8 hover:text-white/60'
-                        }`}
-                    >
-                      <div
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] transition-all duration-300 ${isActive ? 'bg-amber-400 text-[#1a2d45] shadow' : isDone ? 'bg-emerald-500 text-white' : 'bg-white/10'
-                          }`}
-                        style={{
-                          transform: isBouncing ? 'scale(1.3)' : 'scale(1)',
-                          transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                        }}
-                      >
-                        {isDone && !isActive ? '✓' : step.icon}
+                  <div key={step.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                    <button type="button" className="step-btn" onClick={() => handleStepChange(step.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        borderRadius: 11, padding: '9px 10px', textAlign: 'left', border: 'none', cursor: 'pointer',
+                        background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        color: isActive ? TEXT : isDone ? GREEN_LT : FAINT,
+                      }}>
+                      <div style={{
+                        width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: isActive ? AMBER : isDone ? GREEN : 'rgba(255,255,255,0.07)',
+                        color: isActive ? '#1a0f00' : isDone ? '#fff' : FAINT,
+                        transform: isBounce ? 'scale(1.3)' : 'scale(1)',
+                        transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1), background .2s',
+                      }}>
+                        {isDone && !isActive
+                          ? <Ic.check width={13} height={13} />
+                          : <span style={{ fontSize: 11, fontWeight: 800, fontFamily: SANS }}>{idx + 1}</span>
+                        }
                       </div>
-                      <div>
-                        <p className="text-[11px] font-bold leading-tight">{step.label}</p>
-                        <p className={`text-[10px] ${isActive ? 'text-white/50' : 'text-white/20'}`}>{step.time}</p>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ margin: '0 0 1px', fontSize: 12, fontWeight: 700, lineHeight: 1.2, fontFamily: SANS }}>{step.label}</p>
+                        <p style={{ margin: 0, fontSize: 9.5, fontFamily: MONO, color: isActive ? MUTED : FAINT }}>{step.time}</p>
                       </div>
                     </button>
                     {idx < STEPS.length - 1 && (
-                      <div className={`ml-[22px] h-3 w-0.5 rounded-full transition-colors duration-300 ${isDone ? 'bg-emerald-500/40' : 'bg-white/10'}`} />
+                      <div style={{ marginLeft: 25, width: 2, height: 10, borderRadius: 1, background: isDone ? hexA(GREEN, 0.5) : 'rgba(255,255,255,0.07)' }} />
                     )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="mt-5 border-t border-white/10 pt-4">
-              <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold ${diffCfg.color}`}>
-                {diffCfg.stars} {diffCfg.label}
+            {/* diff badge */}
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${LINE_S}`, display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 99, padding: '3px 10px', fontSize: 10, fontWeight: 700, fontFamily: MONO, background: hexA(diffColor, 0.14), color: diffColor, border: `1px solid ${hexA(diffColor, 0.25)}` }}>
+                {activity.difficulty}
               </span>
-              {alreadyCompleted && (
-                <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                  ✓ Done
+              {alreadyDone && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 99, padding: '3px 10px', fontSize: 10, fontWeight: 700, fontFamily: MONO, background: hexA(GREEN, 0.14), color: GREEN_LT, border: `1px solid ${hexA(GREEN, 0.25)}` }}>
+                  <Ic.check width={8} height={8} /> Done
                 </span>
               )}
             </div>
 
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => { if (currentStep > 0) setCurrentStep(currentStep - 1); }}
-                disabled={currentStep === 0}
-                className="w-full rounded-xl bg-white/10 py-2 text-[11px] font-bold text-white/70 transition-all hover:bg-white/15 disabled:opacity-30"
-              >
-                ← Previous
+            {/* nav buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 12 }}>
+              <button type="button" disabled={currentStep === 0}
+                onClick={() => currentStep > 0 && setCurrentStep(currentStep - 1)}
+                style={{ padding: '9px', borderRadius: 11, border: `1px solid ${LINE}`, cursor: currentStep === 0 ? 'not-allowed' : 'pointer', background: 'rgba(255,255,255,0.04)', color: MUTED, fontSize: 11, fontWeight: 700, fontFamily: SANS, opacity: currentStep === 0 ? 0.35 : 1, transition: 'opacity .15s' }}>
+                Previous
               </button>
-              {currentStep < STEPS.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={() => handleStepChange(currentStep + 1)}
-                  className="w-full rounded-xl bg-amber-400 py-2 text-[11px] font-extrabold text-[#1a2d45] transition-all hover:bg-amber-300 active:scale-95"
-                >
-                  Next: {STEPS[currentStep + 1].label} →
+              {currentStep < STEPS.length - 1
+                ? <button type="button" onClick={() => handleStepChange(currentStep + 1)}
+                  style={{ padding: '9px', borderRadius: 11, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,#78350f,${AMBER})`, color: '#1a0f00', fontSize: 11, fontWeight: 800, fontFamily: SANS }}>
+                  Next: {STEPS[currentStep + 1].label}
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleDone}
-                  className="w-full rounded-xl bg-emerald-500 py-2 text-[11px] font-extrabold text-white transition-all hover:bg-emerald-400 active:scale-95"
-                >
-                  {alreadyCompleted ? '✓ Done' : '🎉 Complete!'}
+                : <button type="button" onClick={handleDone}
+                  style={{ padding: '9px', borderRadius: 11, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,#065f46,${GREEN})`, color: '#fff', fontSize: 11, fontWeight: 800, fontFamily: SANS }}>
+                  {alreadyDone ? 'Review Complete' : 'Complete Mission'}
                 </button>
-              )}
+              }
             </div>
           </div>
         </aside>
 
-        {/* ── RIGHT CONTENT ── */}
-        <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="px-6 py-6">
+        {/* ══ MAIN CONTENT ══ */}
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 28px 60px' }}>
 
-            {/* Mobile topbar */}
-            <div className="mb-4 flex items-center justify-between md:hidden">
-              <button type="button" onClick={() => router.push('/activities')} className="text-xs text-gray-500 hover:text-[#1a2d45]">
-                ← Activities
-              </button>
-              <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${diffCfg.color}`}>{diffCfg.stars} {diffCfg.label}</span>
-            </div>
-
-            {/* Desktop breadcrumb */}
-            <div className="mb-4 hidden items-center gap-2 text-[11px] text-gray-400 md:flex">
-              <span>⚡ Activities</span>
+            {/* breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 20, fontSize: 11, color: FAINT, fontFamily: MONO }}>
+              <button type="button" onClick={() => router.push('/activities')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: FAINT, fontFamily: MONO, fontSize: 11, padding: 0 }}>Activities</button>
               <span>/</span>
-              <span className="font-bold text-[#1a2d45]">{activity.title}</span>
-              {alreadyCompleted && (
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">✓ Completed</span>
+              <span style={{ color: MUTED, fontWeight: 700 }}>{activity.title}</span>
+              {alreadyDone && (
+                <span style={{ borderRadius: 99, padding: '2px 9px', fontSize: 9, fontWeight: 700, fontFamily: MONO, background: hexA(GREEN, 0.12), border: `1px solid ${hexA(GREEN, 0.25)}`, color: GREEN_LT }}>
+                  Completed
+                </span>
               )}
             </div>
 
@@ -754,27 +775,22 @@ export default function ActivityDetailPage() {
               {currentStep === 4 && <OutputStep activity={activity} />}
             </StepContent>
 
-            {/* Mobile bottom nav */}
-            <div className="mt-6 flex items-center justify-between md:hidden">
-              <button
-                type="button"
-                onClick={() => { if (currentStep > 0) setCurrentStep(currentStep - 1); }}
-                disabled={currentStep === 0}
-                className="rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-[#1a2d45] shadow-sm disabled:opacity-30"
-              >
-                ← Prev
+            {/* mobile nav */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, paddingTop: 20, borderTop: `1px solid ${LINE_S}` }}>
+              <button type="button" disabled={currentStep === 0} onClick={() => currentStep > 0 && setCurrentStep(currentStep - 1)}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 18px', borderRadius: 11, border: `1px solid ${LINE}`, cursor: currentStep === 0 ? 'not-allowed' : 'pointer', background: PANEL, color: MUTED, fontSize: 13, fontWeight: 700, fontFamily: SANS, opacity: currentStep === 0 ? 0.35 : 1 }}>
+                <Ic.arrowL width={14} height={14} /> Previous
               </button>
-              {currentStep < STEPS.length - 1 ? (
-                <button type="button" onClick={() => handleStepChange(currentStep + 1)}
-                  className="rounded-xl bg-[#1a2d45] px-5 py-2.5 text-sm font-bold text-white shadow-sm">
-                  Next →
+              {currentStep < STEPS.length - 1
+                ? <button type="button" onClick={() => handleStepChange(currentStep + 1)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,#1a3a8a,${BLUE})`, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: SANS, boxShadow: `0 6px 20px -6px ${hexA(BLUE, 0.6)}` }}>
+                  {STEPS[currentStep + 1].label} <Ic.arrow width={14} height={14} />
                 </button>
-              ) : (
-                <button type="button" onClick={handleDone}
-                  className="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm">
-                  🎉 Complete!
+                : <button type="button" onClick={handleDone}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 11, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,#065f46,${GREEN})`, color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: SANS, boxShadow: `0 6px 20px -6px ${hexA(GREEN, 0.6)}` }}>
+                  <Ic.check width={14} height={14} /> {alreadyDone ? 'Review Complete' : 'Complete Mission'}
                 </button>
-              )}
+              }
             </div>
           </div>
         </div>
